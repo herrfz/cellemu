@@ -4,6 +4,7 @@ package worker
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/herrfz/cellemu/ecdh"
 	msg "github.com/herrfz/gowdc/messages"
 )
 
@@ -58,13 +59,61 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte) {
 		case 0x17: // data request
 			fmt.Println("received data request",
 				hex.EncodeToString(buf))
-			msg.WDC_MAC_DATA_CON[2] = buf[2]
+			// parse WDC_MAC_DATA_REQ, cf. EADS MAC Table 29
+			HANDLE := buf[2]
+			TXOPTS := buf[3]
+			ADDRMODE := (TXOPTS>>3)&1
+			DSTPAN := buf[4:6]
+			if ADDRMODE == 0 {
+				DSTADDR := buf[6:8]
+				MSDULEN := buf[8]
+				MSDU := buf[9:]
+			} else if ADDRMODE == 1 {
+				DSTADDR := buf[6:14]
+				MSDULEN := buf[14]
+				MSDU := buf[15:]
+			}
+			if MSDULEN != len(MSDU) {
+				// TODO, currently drop
+				continue
+			}
+
+			// first, send confirmation
+			msg.WDC_MAC_DATA_CON[2] = HANDLE
 			msg.WDC_MAC_DATA_CON[3] = 0x00
 			ul_chan <- msg.WDC_MAC_DATA_CON
 			fmt.Println("sent data confirmation",
 				hex.EncodeToString(msg.WDC_MAC_DATA_CON))
 
+			mID := MSDU[0]
 			// TODO key exchange emulation will be done here
+			switch mID {
+			case 0x09, 0x0A:
+				//dosmth
+			case 0x01:
+				//donik / unauth ecdh
+				dap := MSDU[1:]
+				if !ecdh.CheckPublic(dap) {
+					// drop
+					continue
+				}
+				db, _ := ecdh.GeneratePrivate()
+				dbp := ecdh.GeneratePublic(db)
+				zz, _ := ecdh.GenerateSecret(db, dap)
+				// TODO compute NIK := sha256(zz)[:128]
+
+				// FCF (Table 4): 0010000000100110
+				fmt.Println(zz, dbp)
+				
+			case 0x03, 0x05:
+				//doltss, dosessionkey / auth ecdh
+			case 0x0B:
+				//dosbk
+			default:
+				fmt.Println("received wrong mID")
+				// drop
+				continue
+			}
 
 		default:
 			fmt.Println("received wrong cmd")
