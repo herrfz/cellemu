@@ -5,7 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"github.com/herrfz/cellemu/ecdh"
+	"github.com/herrfz/cellemu/crypto/ecdh"
 	msg "github.com/herrfz/gowdc/messages"
 )
 
