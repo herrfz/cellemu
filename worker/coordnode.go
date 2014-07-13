@@ -9,12 +9,16 @@ import (
 	msg "github.com/herrfz/gowdc/messages"
 )
 
-func EmulCoordNode(dl_chan, ul_chan, ul_chan_2 chan []byte) {
+func EmulCoordNode(dl_chan, ul_chan chan []byte) {
 	for {
 		var MSDULEN int
 		var MSDU []byte //, DSTADDR []byte
 
 		buf := <-dl_chan
+
+		if len(buf) == 0 {
+			continue
+		}
 
 		switch buf[1] {
 		case 0x01:
@@ -136,7 +140,7 @@ func EmulCoordNode(dl_chan, ul_chan, ul_chan_2 chan []byte) {
 				fmt.Println("created data IND:",
 					hex.EncodeToString(IND))
 
-				ul_chan_2 <- IND
+				ul_chan <- IND
 				fmt.Println("sent WDC_MAC_DATA_IND:",
 					hex.EncodeToString(IND))
 

@@ -21,39 +21,46 @@ func main() {
 
 	dl_chan := make(chan []byte)
 	ul_chan := make(chan []byte)
-	ul_chan_2 := make(chan []byte)
 
-	go work.EmulCoordNode(dl_chan, ul_chan, ul_chan_2)
+	go work.EmulCoordNode(dl_chan, ul_chan)
 
-	go func() {
-		for {
-			buf, _ := c_sock.Recv(0)
-			dl_chan <- []byte(buf)
+	data_ch := makeChannel(d_dl_sock)
+	cmd_ch := makeChannel(c_sock)
+
+	for {
+		select {
+		case d1 := <-cmd_ch:
+			// TCP strangely sends [] when ending message
+			if len(d1) == 0 {
+				continue
+			}
+			dl_chan <- []byte(d1)
 
 			dbuf := <-ul_chan
 			c_sock.Send(string(dbuf), 0)
 			fmt.Println("sent answer to TCP command")
-		}
-	}()
 
-	go func() {
-		for {
-			buf, _ := d_dl_sock.Recv(0)
-			dl_chan <- []byte(buf)
+		case d2 := <-data_ch:
+			dl_chan <- []byte(d2)
 
 			dbuf := <-ul_chan
 			d_ul_sock.Send(string(dbuf), 0)
 			fmt.Println("sent answer to UDP mcast message")
-		}
-	}()
 
-	go func() {
-		for {
-			dbuf := <-ul_chan_2
-			d_ul_sock.Send(string(dbuf), 0)
+		case d3 := <-ul_chan:
+			d_ul_sock.Send(string(d3), 0)
 			fmt.Println("sent node uplink message")
 		}
-	}()
+	}
+}
 
-	select {}
+func makeChannel(sock *zmq.Socket) <-chan []byte {
+	c := make(chan []byte)
+	go func() {
+		for {
+			buf, _ := sock.Recv(0)
+			c <- []byte(buf)
+		}
+	}()
+	return c
 }
