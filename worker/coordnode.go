@@ -2,14 +2,18 @@
 package worker
 
 import (
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"github.com/herrfz/cellemu/ecdh"
 	msg "github.com/herrfz/gowdc/messages"
 )
 
-func EmulCoordNode(dl_chan, ul_chan chan []byte) {
+func EmulCoordNode(dl_chan, ul_chan, ul_chan_2 chan []byte) {
 	for {
+		var MSDULEN int
+		var MSDU []byte //, DSTADDR []byte
+
 		buf := <-dl_chan
 
 		switch buf[1] {
@@ -62,16 +66,16 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte) {
 			// parse WDC_MAC_DATA_REQ, cf. EADS MAC Table 29
 			HANDLE := buf[2]
 			TXOPTS := buf[3]
-			ADDRMODE := (TXOPTS>>3)&1
-			DSTPAN := buf[4:6]
-			if ADDRMODE == 0 {
-				DSTADDR := buf[6:8]
-				MSDULEN := buf[8]
-				MSDU := buf[9:]
-			} else if ADDRMODE == 1 {
-				DSTADDR := buf[6:14]
-				MSDULEN := buf[14]
-				MSDU := buf[15:]
+			ADDRMODE := (TXOPTS >> 3) & 1 // TBC, bit 4 of TXOPTS
+			//DSTPAN := buf[4:6]
+			if ADDRMODE == 0 { // short addr mode
+				//DSTADDR = buf[6:8]  // (16 bits)
+				MSDULEN = int(buf[8])
+				MSDU = buf[9:]
+			} else if ADDRMODE == 1 { // long addr mode
+				//DSTADDR = buf[6:14]  // (64 bits)
+				MSDULEN = int(buf[14])
+				MSDU = buf[15:]
 			}
 			if MSDULEN != len(MSDU) {
 				// TODO, currently drop
@@ -80,35 +84,66 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte) {
 
 			// first, send confirmation
 			msg.WDC_MAC_DATA_CON[2] = HANDLE
-			msg.WDC_MAC_DATA_CON[3] = 0x00
+			msg.WDC_MAC_DATA_CON[3] = 0x00 // success
 			ul_chan <- msg.WDC_MAC_DATA_CON
 			fmt.Println("sent data confirmation",
 				hex.EncodeToString(msg.WDC_MAC_DATA_CON))
 
+			// prepare a return IND message
+			// DOESN'T WORK, ARRAY OUT OF BOUND EXCEPTION AT SERVER
+			// FCF: 0010 0000 0010 0000
+			MHR := []byte{0x01, 0x88, // FCF, (see Emeric's noserial.patch)
+				0x00,       // sequence number, must be set to zero
+				0xff, 0xff, // WDC PAN
+				0xff, 0xff, // WDC address
+				0x1c, 0xaa, // sensor PAN, little endian, TODO use DSTPAN
+				0x01, 0x00} // sensor address, little endian, TODO use DSTADDR
+
+			// trailing LQI, ED, RX status, RX slot; TODO, all zeros for now
+			// I have to add one 0x00 to remove server error!! why!!
+			trail := []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+
 			mID := MSDU[0]
-			// TODO key exchange emulation will be done here
 			switch mID {
 			case 0x09, 0x0A:
-				//dosmth
+				// do nothing
+				continue
 			case 0x01:
-				//donik / unauth ecdh
+				// nik / unauth ecdh
 				dap := MSDU[1:]
 				if !ecdh.CheckPublic(dap) {
 					// drop
+					fmt.Println("received invalid public key:",
+						hex.EncodeToString(dap))
 					continue
 				}
 				db, _ := ecdh.GeneratePrivate()
 				dbp := ecdh.GeneratePublic(db)
 				zz, _ := ecdh.GenerateSecret(db, dap)
-				// TODO compute NIK := sha256(zz)[:128]
+				zz_h := sha256.Sum256(zz)
+				NIK := zz_h[:16] // NIK := first 128 bit of the hash of the secret
+				fmt.Println("generated NIK:",
+					hex.EncodeToString(NIK))
 
-				// FCF (Table 4): 0010000000100110
-				fmt.Println(zz, dbp)
-				
+				MFR := []byte{0xde, 0xad}                // FCS, 16-bit CRC <--fake
+				PSDU := append(MHR, append([]byte{0x02}, // mID NIK response
+					append(dbp, MFR...)...)...)
+				PHR := []byte{byte(len(PSDU))}
+
+				IND := append(PHR, append(PSDU, trail...)...)
+				IND = append([]byte{byte(len(IND))}, append([]byte{0x19}, // WDC_MAC_DATA_IND
+					IND...)...)
+				fmt.Println("created data IND:",
+					hex.EncodeToString(IND))
+
+				ul_chan_2 <- IND
+				fmt.Println("sent WDC_MAC_DATA_IND:",
+					hex.EncodeToString(IND))
+
 			case 0x03, 0x05:
-				//doltss, dosessionkey / auth ecdh
+				// ltss, sessionkey / auth ecdh
 			case 0x0B:
-				//dosbk
+				// sbk
 			default:
 				fmt.Println("received wrong mID")
 				// drop
@@ -119,7 +154,6 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte) {
 			fmt.Println("received wrong cmd")
 			// send back WDC_ERROR
 			msg.WDC_ERROR[2] = byte(msg.WRONG_CMD)
-			// TODO confirm this (send over d, not c channel)
 			ul_chan <- msg.WDC_ERROR
 		}
 	}
