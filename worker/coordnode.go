@@ -8,8 +8,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/herrfz/cellemu/crypto/ecdh"
-	//"github.com/herrfz/cellemu/crypto/hkdf"
-	//"io"
+	"github.com/herrfz/cellemu/crypto/hkdf"
 	msg "github.com/herrfz/gowdc/messages"
 )
 
@@ -18,12 +17,9 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte) {
 		var MSDULEN int
 		var MSDU []byte
 
-		var NIK []byte
-
-		// var CTX = []byte("contessa")
-		// var S = make([]byte, 16)
-		// var AK = make([]byte, 16)
-		// var SIK, SCK, SBK []byte
+		var NIK, S, AK, SIK, SCK []byte
+		var KEYS = make([]byte, 32)
+		var CTX = []byte("contessa")
 		// var DSTADDR []byte
 
 		buf := <-dl_chan
@@ -183,7 +179,7 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte) {
 				}
 				db, _ := ecdh.GeneratePrivate()
 				dbp := ecdh.GeneratePublic(db)
-				//zz, _ := ecdh.GenerateSecret(db, dap)
+				zz, _ := ecdh.GenerateSecret(db, dap)
 
 				salt := make([]byte, 16)
 				_, err := rand.Read(salt)
@@ -195,6 +191,9 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte) {
 				// KDF TODO: stick with HKDF or switch to PBKDF2?
 				// PBKDF2 is implemented both in Java and PolarSSL
 				// HKDF only in Java
+				// the one below uses hkdf
+				hkdf := hkdf.New(sha256.New, zz, salt, CTX)
+				hkdf.Read(KEYS)
 
 				// construct WDC_MAC_DATA_IND return message
 				MHR = []byte{0x01, 0x88, // FCF, (see Emeric's noserial.patch)
@@ -207,9 +206,17 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte) {
 				if mID == 0x03 {
 					MPDU = append(MHR, append([]byte{0x04}, // mID LTSS response
 						append(dbp, salt...)...)...)
+					S = KEYS[:16]
+					AK = KEYS[16:]
+					fmt.Println("created LTSS:", hex.EncodeToString(S), 
+						hex.EncodeToString(AK))
 				} else if mID == 0x05 {
 					MPDU = append(MHR, append([]byte{0x06}, // mID session key response
 						append(dbp, salt...)...)...)
+					SIK = KEYS[:16]
+					SCK = KEYS[16:]
+					fmt.Println("created session keys:", hex.EncodeToString(SIK), 
+						hex.EncodeToString(SCK))
 				}
 
 				mac = hmac.New(sha256.New, NIK)
