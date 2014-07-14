@@ -2,17 +2,29 @@
 package worker
 
 import (
+	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"github.com/herrfz/cellemu/crypto/ecdh"
+	//"github.com/herrfz/cellemu/crypto/hkdf"
+	//"io"
 	msg "github.com/herrfz/gowdc/messages"
 )
 
 func EmulCoordNode(dl_chan, ul_chan chan []byte) {
 	for {
 		var MSDULEN int
-		var MSDU []byte //, DSTADDR []byte
+		var MSDU []byte
+
+		var NIK []byte
+
+		// var CTX = []byte("contessa")
+		// var S = make([]byte, 16)
+		// var AK = make([]byte, 16)
+		// var SIK, SCK, SBK []byte
+		// var DSTADDR []byte
 
 		buf := <-dl_chan
 
@@ -93,16 +105,6 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte) {
 			fmt.Println("sent data confirmation",
 				hex.EncodeToString(msg.WDC_MAC_DATA_CON))
 
-			// prepare a return IND message
-			// DOESN'T WORK, ARRAY OUT OF BOUND EXCEPTION AT SERVER
-			// FCF: 0010 0000 0010 0000
-			MHR := []byte{0x01, 0x88, // FCF, (see Emeric's noserial.patch)
-				0x00,       // sequence number, must be set to zero
-				0xff, 0xff, // WDC PAN
-				0xff, 0xff, // WDC address
-				0x1c, 0xaa, // sensor PAN, little endian, TODO use DSTPAN
-				0x01, 0x00} // sensor address, little endian, TODO use DSTADDR
-
 			// trailing LQI, ED, RX status, RX slot; TODO, all zeros for now
 			// I have to add one 0x00 to remove server error!! why!!
 			trail := []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
@@ -125,20 +127,27 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte) {
 				dbp := ecdh.GeneratePublic(db)
 				zz, _ := ecdh.GenerateSecret(db, dap)
 				zz_h := sha256.Sum256(zz)
-				NIK := zz_h[:16] // NIK := first 128 bit of the hash of the secret
+				NIK = zz_h[:16] // NIK := first 128 bits / 16 Bytes of the hash of the secret
 				fmt.Println("generated NIK:",
 					hex.EncodeToString(NIK))
 
-				MFR := []byte{0xde, 0xad}                // FCS, 16-bit CRC <--fake
+				// construct WDC_MAC_DATA_IND return message
+				MHR := []byte{0x01, 0x88, // FCF, (see Emeric's noserial.patch)
+					0x00,       // sequence number, must be set to zero
+					0xff, 0xff, // WDC PAN
+					0xff, 0xff, // WDC address
+					0x1c, 0xaa, // sensor PAN, little endian, TODO use DSTPAN
+					0x01, 0x00} // sensor address, little endian, TODO use DSTADDR
+
+				MFR := []byte{0xde, 0xad} // FCS, 16-bit CRC <--fake
+
 				PSDU := append(MHR, append([]byte{0x02}, // mID NIK response
 					append(dbp, MFR...)...)...)
-				PHR := []byte{byte(len(PSDU))}
 
+				PHR := []byte{byte(len(PSDU))}
 				IND := append(PHR, append(PSDU, trail...)...)
 				IND = append([]byte{byte(len(IND))}, append([]byte{0x19}, // WDC_MAC_DATA_IND
 					IND...)...)
-				fmt.Println("created data IND:",
-					hex.EncodeToString(IND))
 
 				ul_chan <- IND
 				fmt.Println("sent WDC_MAC_DATA_IND:",
@@ -146,6 +155,80 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte) {
 
 			case 0x03, 0x05:
 				// ltss, sessionkey / auth ecdh
+				msgMAC := MSDU[MSDULEN-8:] // msgMAC := last 8 Bytes of MSDU
+
+				// construct WDC_MAC_DATA_REQ for which the msgMAC is computed
+				MHR := []byte{0x01, 0x88, // FCF, (see Emeric's noserial.patch)
+					0x00,       // sequence number, must be set to zero
+					0x1c, 0xaa, // sensor PAN
+					0x01, 0x00, // sensor address
+					0xff, 0xff, // WDC PAN
+					0xff, 0xff} // WDC address
+				MPDU := append(MHR, MSDU...)
+				mac := hmac.New(sha256.New, NIK)
+				mac.Write(MPDU)
+				expectedMAC := mac.Sum(nil)
+				if !hmac.Equal(msgMAC, expectedMAC) {
+					// MAC verification fails, drop
+					fmt.Println("failed MAC verification")
+					continue
+				}
+
+				dap := MSDU[1 : MSDULEN-8]
+				if !ecdh.CheckPublic(dap) {
+					// drop
+					fmt.Println("received invalid public key:",
+						hex.EncodeToString(dap))
+					continue
+				}
+				db, _ := ecdh.GeneratePrivate()
+				dbp := ecdh.GeneratePublic(db)
+				//zz, _ := ecdh.GenerateSecret(db, dap)
+
+				salt := make([]byte, 16)
+				_, err := rand.Read(salt)
+				if err != nil {
+					fmt.Println("error generating salt:", err)
+					continue
+				}
+
+				// KDF TODO: stick with HKDF or switch to PBKDF2?
+				// PBKDF2 is implemented both in Java and PolarSSL
+				// HKDF only in Java
+
+				// construct WDC_MAC_DATA_IND return message
+				MHR = []byte{0x01, 0x88, // FCF, (see Emeric's noserial.patch)
+					0x00,       // sequence number, must be set to zero
+					0xff, 0xff, // WDC PAN
+					0xff, 0xff, // WDC address
+					0x1c, 0xaa, // sensor PAN
+					0x01, 0x00} // sensor address
+
+				if mID == 0x03 {
+					MPDU = append(MHR, append([]byte{0x04}, // mID LTSS response
+						append(dbp, salt...)...)...)
+				} else if mID == 0x05 {
+					MPDU = append(MHR, append([]byte{0x06}, // mID session key response
+						append(dbp, salt...)...)...)
+				}
+
+				mac = hmac.New(sha256.New, NIK)
+				mac.Write(MPDU)
+				msgMAC = mac.Sum(nil)
+
+				MFR := []byte{0xde, 0xad} // FCS, 16-bit CRC <--fake
+
+				PSDU := append(MPDU, append(msgMAC, MFR...)...)
+
+				PHR := []byte{byte(len(PSDU))}
+				IND := append(PHR, append(PSDU, trail...)...)
+				IND = append([]byte{byte(len(IND))}, append([]byte{0x19}, // WDC_MAC_DATA_IND
+					IND...)...)
+
+				ul_chan <- IND
+				fmt.Println("sent WDC_MAC_DATA_IND:",
+					hex.EncodeToString(IND))
+
 			case 0x0B:
 				// sbk
 			default:
