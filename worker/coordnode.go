@@ -208,14 +208,14 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte) {
 						append(dbp, salt...)...)...)
 					S = KEYS[:16]
 					AK = KEYS[16:]
-					fmt.Println("created LTSS:", hex.EncodeToString(S), 
+					fmt.Println("created LTSS:", hex.EncodeToString(S),
 						hex.EncodeToString(AK))
 				} else if mID == 0x05 {
 					MPDU = append(MHR, append([]byte{0x06}, // mID session key response
 						append(dbp, salt...)...)...)
 					SIK = KEYS[:16]
 					SCK = KEYS[16:]
-					fmt.Println("created session keys:", hex.EncodeToString(SIK), 
+					fmt.Println("created session keys:", hex.EncodeToString(SIK),
 						hex.EncodeToString(SCK))
 				}
 
