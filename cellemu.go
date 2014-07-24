@@ -3,8 +3,22 @@ package main
 import (
 	"fmt"
 	work "github.com/herrfz/cellemu/worker"
+	"github.com/herrfz/gowdc/utils"
 	zmq "github.com/pebbe/zmq4"
 )
+
+type Socket struct {
+	socket *zmq.Socket
+}
+
+func (sock Socket) Read() ([]byte, error) {
+	buf, err := sock.socket.Recv(0)
+	if err != nil {
+		return nil, err
+	} else {
+		return []byte(buf), nil
+	}
+}
 
 func main() {
 	c_sock, _ := zmq.NewSocket(zmq.REP)
@@ -24,8 +38,8 @@ func main() {
 
 	go work.EmulCoordNode(dl_chan, ul_chan)
 
-	data_ch := makeChannel(d_dl_sock)
-	cmd_ch := makeChannel(c_sock)
+	data_ch := utils.MakeChannel(Socket{d_dl_sock})
+	cmd_ch := utils.MakeChannel(Socket{c_sock})
 
 	for {
 		select {
@@ -35,14 +49,12 @@ func main() {
 				continue
 			}
 			dl_chan <- []byte(d1)
-
 			dbuf := <-ul_chan
 			c_sock.Send(string(dbuf), 0)
 			fmt.Println("sent answer to TCP command")
 
 		case d2 := <-data_ch:
 			dl_chan <- []byte(d2)
-
 			dbuf := <-ul_chan
 			d_ul_sock.Send(string(dbuf), 0)
 			fmt.Println("sent answer to UDP mcast message")
@@ -52,15 +64,4 @@ func main() {
 			fmt.Println("sent node uplink message")
 		}
 	}
-}
-
-func makeChannel(sock *zmq.Socket) <-chan []byte {
-	c := make(chan []byte)
-	go func() {
-		for {
-			buf, _ := sock.Recv(0)
-			c <- []byte(buf)
-		}
-	}()
-	return c
 }

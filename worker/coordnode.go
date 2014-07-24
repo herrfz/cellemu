@@ -62,7 +62,8 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte) {
 
 		case 0x13: // stop TDMA
 			fmt.Println("received stop TDMA")
-			msg.WDC_ACK[1] = 0x14 // STOP_TDMA_REQ_ACK
+			msg.WDC_GET_TDMA_RES[2] = 0x00 // stopped
+			msg.WDC_ACK[1] = 0x14          // STOP_TDMA_REQ_ACK
 			ul_chan <- msg.WDC_ACK
 			fmt.Println("TDMA stopped")
 
