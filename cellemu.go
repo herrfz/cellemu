@@ -13,11 +13,7 @@ type Socket struct {
 
 func (sock Socket) Read() ([]byte, error) {
 	buf, err := sock.socket.Recv(0)
-	if err != nil {
-		return nil, err
-	} else {
-		return []byte(buf), nil
-	}
+	return []byte(buf), err
 }
 
 func main() {
