@@ -25,6 +25,8 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte) {
 		buf := <-dl_chan
 
 		if len(buf) == 0 {
+			dummy := make([]byte, 0)
+			ul_chan <- dummy
 			continue
 		}
 

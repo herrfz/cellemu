@@ -13,6 +13,12 @@ type Socket struct {
 
 func (sock Socket) Read() ([]byte, error) {
 	buf, err := sock.socket.Recv(0)
+	if err != nil {
+		if err.Error() == "Operation cannot be accomplished in current state" {
+			// give some time for REP socket to send before another recv
+			return nil, fmt.Errorf("DONTPANIC")
+		}
+	}
 	return []byte(buf), err
 }
 
@@ -40,10 +46,6 @@ func main() {
 	for {
 		select {
 		case d1 := <-cmd_ch:
-			// TCP strangely sends [] when ending message
-			if len(d1) == 0 {
-				continue
-			}
 			dl_chan <- []byte(d1)
 			dbuf := <-ul_chan
 			c_sock.Send(string(dbuf), 0)
