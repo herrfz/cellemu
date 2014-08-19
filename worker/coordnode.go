@@ -125,6 +125,8 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte) {
 				db, _ := ecdh.GeneratePrivate()
 				dbp := ecdh.GeneratePublic(db)
 				zz, _ := ecdh.GenerateSecret(db, dap)
+				fmt.Println("shared secret:",
+					hex.EncodeToString(zz))
 				zz_h := sha256.Sum256(zz)
 				NIK = zz_h[:16] // NIK := first 128 bits / 16 Bytes of the hash of the secret
 				fmt.Println("generated NIK:",

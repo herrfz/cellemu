@@ -19,8 +19,9 @@ var (
 	pub_B   = append(x_qB.Bytes(), y_qB.Bytes()...)
 
 	x_Z, _ = new(big.Int).SetString("DD0F5396219D1EA393310412D19A08F1F5811E9DC8EC8EEA7F80D21C820C2788", 16)
-	y_Z, _ = new(big.Int).SetString("0357DCCD4C804D0D8D33AA42B848834AA5605F9AB0D37239A115BBB647936F50", 16)
-	ZZ     = append(x_Z.Bytes(), y_Z.Bytes()...)
+	// y_Z, _ = new(big.Int).SetString("0357DCCD4C804D0D8D33AA42B848834AA5605F9AB0D37239A115BBB647936F50", 16)
+	// PolarSSL shared secret
+	ZZ     = x_Z.Bytes()
 )
 
 func TestGenPubKey(t *testing.T) {

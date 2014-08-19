@@ -46,6 +46,6 @@ func GenerateSecret(privkey, otherpubkey []byte) ([]byte, error) {
 
 	px := new(big.Int).SetBytes(otherpubkey[:ByteSize])
 	py := new(big.Int).SetBytes(otherpubkey[ByteSize:])
-	secx, secy := curve.ScalarMult(px, py, privkey)
-	return append(secx.Bytes(), secy.Bytes()...), nil
+	secx, _ := curve.ScalarMult(px, py, privkey)
+	return secx.Bytes(), nil
 }
