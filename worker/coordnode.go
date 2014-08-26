@@ -11,13 +11,13 @@ import (
 )
 
 func EmulCoordNode(dl_chan, ul_chan chan []byte) {
+	var MSDULEN int
+	var MSDU []byte
+
+	var NIK, S, AK, SIK, SCK []byte
+	var DSTADDR []byte
+
 	for {
-		var MSDULEN int
-		var MSDU []byte
-
-		var NIK, S, AK, SIK, SCK []byte
-		var DSTADDR []byte
-
 		buf := <-dl_chan
 
 		if len(buf) == 0 {
@@ -152,14 +152,16 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte) {
 					hex.EncodeToString(IND))
 
 			case 0x03, 0x05:
-				var authkey []byte
+				authkey := make([]byte, 16)
 				if mID == 0x03 {
-					authkey = NIK
+					copy(authkey, NIK)
 				} else {
-					authkey = AK
+					copy(authkey, AK)
 				}
 				// ltss, sessionkey / auth ecdh
 				msgMAC := MSDU[MSDULEN-8:] // msgMAC := last 8 Bytes of MSDU
+				MSDU_NOMAC := make([]byte, MSDULEN-8)
+				copy(MSDU_NOMAC, MSDU[:MSDULEN-8])
 
 				// construct WDC_MAC_DATA_REQ for which the msgMAC is computed
 				MHR := []byte{0x01, 0x88, // FCF, (see Emeric's noserial.patch)
@@ -168,24 +170,23 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte) {
 				wdc_addr := []byte{0xff, 0xff, // WDC PAN
 					0xff, 0xff} // WDC address
 
-				//	0x1c, 0xaa, // sensor PAN
-				//	0x01, 0x00, // sensor address
 				MHR = append(MHR, append(sensor_addr, wdc_addr...)...)
 
-				MPDU := append(MHR, MSDU...)
+				MPDU := append(MHR, MSDU_NOMAC...)
 
 				mac := hmac.New(sha256.New, authkey)
 				mac.Write(MPDU)
-				expectedMAC := mac.Sum(nil)
-				expectedMAC = expectedMAC[:8] // truncate to first 8 Bytes
+				sha256_mac := mac.Sum(nil)
+				expectedMAC := make([]byte, 8)
+				copy(expectedMAC, sha256_mac[:8]) // truncate to first 8 Bytes
 				if !hmac.Equal(msgMAC, expectedMAC) {
 					// MAC verification fails, drop
-					fmt.Println("failed MAC verification, expected:",
-						hex.EncodeToString(expectedMAC))
+					fmt.Printf("failed MAC verification, MPDU: %s, key: %s, expectedMAC: %s\n",
+						hex.EncodeToString(MPDU), hex.EncodeToString(authkey), hex.EncodeToString(expectedMAC))
 					continue
 				}
 
-				dap := MSDU[1 : MSDULEN-8]
+				dap := MSDU_NOMAC[1:]
 				if !ecdh.CheckPublic(dap) {
 					// drop
 					fmt.Println("received invalid public key:",
@@ -202,10 +203,6 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte) {
 				// construct WDC_MAC_DATA_IND return message
 				MHR = []byte{0x01, 0x88, // FCF, (see Emeric's noserial.patch)
 					0x00} // sequence number, must be set to zero
-				//	0xff, 0xff, // WDC PAN
-				//	0xff, 0xff, // WDC address
-				//	0x1c, 0xaa, // sensor PAN
-				//	0x01, 0x00} // sensor address
 				MHR = append(MHR, append(wdc_addr, sensor_addr...)...)
 
 				if mID == 0x03 {
@@ -226,10 +223,8 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte) {
 
 				mac = hmac.New(sha256.New, authkey)
 				mac.Write(MPDU)
-				msgMAC = mac.Sum(nil)
-				msgMAC = msgMAC[:8] // truncate to first 8 Bytes
-				fmt.Println("computed MAC for IND message:",
-					hex.EncodeToString(msgMAC))
+				sha256_mac = mac.Sum(nil)
+				copy(msgMAC, sha256_mac[:8]) // truncate to first 8 Bytes
 
 				MFR := []byte{0xde, 0xad} // FCS, 16-bit CRC <--fake
 
