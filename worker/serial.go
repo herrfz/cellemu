@@ -16,6 +16,7 @@ func DoSerial(dl_chan, ul_chan chan []byte) {
 		fmt.Println("error opening serial interface:", err.Error())
 		os.Exit(1)
 	}
+	defer s.Close()
 
 	go read_from_serial(s, ul_chan)
 	go write_to_serial(dl_chan, s)
