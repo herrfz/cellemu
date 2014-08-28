@@ -45,6 +45,11 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte) {
 			ul_chan <- msg.WDC_SET_COOR_LONG_ADDR_REQ_ACK
 			fmt.Println("CorrdNode long address set")
 
+		case 0x09:
+			fmt.Println("received reset command")
+			ul_chan <- msg.WDC_RESET_REQ_ACK
+			fmt.Println("CoordNode reset")
+
 		case 0x10:
 			fmt.Println("received WDC sync")
 			fmt.Println("WDC sync-ed")
