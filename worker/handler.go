@@ -11,7 +11,7 @@ import (
 )
 
 type Message struct {
-	id int
+	id  int
 	msg []byte
 }
 
@@ -22,13 +22,11 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 	var NIK, S, AK, SIK, SCK []byte
 	var DSTADDR []byte
 
-
 	serial_dl_chan := make(chan Message)
 	serial_ul_chan := make(chan Message)
 	if serial {
 		go DoSerial(serial_dl_chan, serial_ul_chan, device)
 	}
-
 
 	for {
 		buf := <-dl_chan
@@ -147,19 +145,16 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 				dap := MSDU[1:]
 				if !ecdh.CheckPublic(dap) {
 					// drop
-					fmt.Println("received invalid public key:",
-						hex.EncodeToString(dap))
+					fmt.Println("received invalid public key:", hex.EncodeToString(dap))
 					continue
 				}
 				db, _ := ecdh.GeneratePrivate()
 				dbp := ecdh.GeneratePublic(db)
 				zz, _ := ecdh.GenerateSecret(db, dap)
-				fmt.Println("shared secret:",
-					hex.EncodeToString(zz))
+				fmt.Println("shared secret:", hex.EncodeToString(zz))
 				zz_h := sha256.Sum256(zz)
 				NIK = zz_h[:16] // NIK := first 128 bits / 16 Bytes of the hash of the secret
-				fmt.Println("generated NIK:",
-					hex.EncodeToString(NIK))
+				fmt.Println("generated NIK:", hex.EncodeToString(NIK))
 
 				// construct WDC_MAC_DATA_IND return message
 				MHR := []byte{0x01, 0x88, // FCF, (see Emeric's noserial.patch)
@@ -176,8 +171,7 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 				IND := MakeWDCInd(PSDU, trail)
 
 				ul_chan <- IND
-				fmt.Println("sent WDC_MAC_DATA_IND:",
-					hex.EncodeToString(IND))
+				fmt.Println("sent WDC_MAC_DATA_IND:", hex.EncodeToString(IND))
 
 			case 0x03, 0x05:
 				if serial {
@@ -253,15 +247,13 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 						dbp...)...)
 					S = KEYS[:16]
 					AK = KEYS[16:]
-					fmt.Println("created LTSS:", hex.EncodeToString(S),
-						hex.EncodeToString(AK))
+					fmt.Println("created LTSS:", hex.EncodeToString(S), hex.EncodeToString(AK))
 				} else {
 					MPDU = append(MHR, append([]byte{0x06}, // mID session key response
 						dbp...)...)
 					SIK = KEYS[:16]
 					SCK = KEYS[16:]
-					fmt.Println("created session keys:", hex.EncodeToString(SIK),
-						hex.EncodeToString(SCK))
+					fmt.Println("created session keys:", hex.EncodeToString(SIK), hex.EncodeToString(SCK))
 				}
 
 				mac = hmac.New(sha256.New, authkey)
@@ -276,8 +268,7 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 				IND := MakeWDCInd(PSDU, trail)
 
 				ul_chan <- IND
-				fmt.Println("sent WDC_MAC_DATA_IND:",
-					hex.EncodeToString(IND))
+				fmt.Println("sent WDC_MAC_DATA_IND:", hex.EncodeToString(IND))
 
 			case 0x0B:
 				// sbk

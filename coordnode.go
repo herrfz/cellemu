@@ -5,8 +5,8 @@ import (
 	"fmt"
 	work "github.com/herrfz/coordnode/worker"
 	"github.com/herrfz/gowdc/utils"
-	"os"
 	zmq "github.com/pebbe/zmq4"
+	"os"
 )
 
 type Socket struct {
