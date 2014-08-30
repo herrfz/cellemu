@@ -6,16 +6,29 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"github.com/herrfz/cellemu/crypto/ecdh"
+	"github.com/herrfz/coordnode/crypto/ecdh"
 	msg "github.com/herrfz/gowdc/messages"
 )
 
-func EmulCoordNode(dl_chan, ul_chan chan []byte) {
+type Message struct {
+	id int
+	msg []byte
+}
+
+func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 	var MSDULEN int
 	var MSDU []byte
 
 	var NIK, S, AK, SIK, SCK []byte
 	var DSTADDR []byte
+
+
+	serial_dl_chan := make(chan Message)
+	serial_ul_chan := make(chan Message)
+	if serial {
+		go DoSerial(serial_dl_chan, serial_ul_chan, device)
+	}
+
 
 	for {
 		buf := <-dl_chan
@@ -115,6 +128,21 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte) {
 				// do nothing
 				continue
 			case 0x01:
+				if serial {
+					MPDU := MakeRequest(DSTPAN, DSTADDR, []byte{0xff, 0xff}, []byte{0xff, 0xff}, MSDU)
+					send_msg := Message{1, MPDU}
+					serial_dl_chan <- send_msg
+					rcv_msg := <-serial_ul_chan
+					if rcv_msg.id == 1 {
+						PSDU := rcv_msg.msg
+						IND := MakeWDCInd(PSDU, trail)
+						ul_chan <- IND
+					} else {
+						ul_chan <- rcv_msg.msg // TODO
+					}
+					continue
+				}
+
 				// nik / unauth ecdh
 				dap := MSDU[1:]
 				if !ecdh.CheckPublic(dap) {
@@ -139,24 +167,34 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte) {
 					0xff, 0xff, // WDC PAN
 					0xff, 0xff} // WDC address
 				MHR = append(MHR, append(DSTPAN, DSTADDR...)...)
-				//	0x1c, 0xaa, // sensor PAN, little endian, TODO use DSTPAN
-				//	0x01, 0x00} // sensor address, little endian, TODO use DSTADDR
 
 				MFR := []byte{0xde, 0xad} // FCS, 16-bit CRC <--fake
 
 				PSDU := append(MHR, append([]byte{0x02}, // mID NIK response
 					append(dbp, MFR...)...)...)
 
-				PHR := []byte{byte(len(PSDU))}
-				IND := append(PHR, append(PSDU, trail...)...)
-				IND = append([]byte{byte(len(IND))}, append([]byte{0x19}, // WDC_MAC_DATA_IND
-					IND...)...)
+				IND := MakeWDCInd(PSDU, trail)
 
 				ul_chan <- IND
 				fmt.Println("sent WDC_MAC_DATA_IND:",
 					hex.EncodeToString(IND))
 
 			case 0x03, 0x05:
+				if serial {
+					MPDU := MakeRequest(DSTPAN, DSTADDR, []byte{0xff, 0xff}, []byte{0xff, 0xff}, MSDU)
+					send_msg := Message{1, MPDU}
+					serial_dl_chan <- send_msg
+					rcv_msg := <-serial_ul_chan
+					if rcv_msg.id == 1 {
+						PSDU := rcv_msg.msg
+						IND := MakeWDCInd(PSDU, trail)
+						ul_chan <- IND
+					} else {
+						ul_chan <- rcv_msg.msg // TODO
+					}
+					continue
+				}
+
 				authkey := make([]byte, 16)
 				if mID == 0x03 {
 					copy(authkey, NIK)
@@ -235,10 +273,7 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte) {
 
 				PSDU := append(MPDU, append(msgMAC, MFR...)...)
 
-				PHR := []byte{byte(len(PSDU))}
-				IND := append(PHR, append(PSDU, trail...)...)
-				IND = append([]byte{byte(len(IND))}, append([]byte{0x19}, // WDC_MAC_DATA_IND
-					IND...)...)
+				IND := MakeWDCInd(PSDU, trail)
 
 				ul_chan <- IND
 				fmt.Println("sent WDC_MAC_DATA_IND:",

@@ -1,9 +1,11 @@
 package main
 
 import (
+	"flag"
 	"fmt"
-	work "github.com/herrfz/cellemu/worker"
+	work "github.com/herrfz/coordnode/worker"
 	"github.com/herrfz/gowdc/utils"
+	"os"
 	zmq "github.com/pebbe/zmq4"
 )
 
@@ -23,6 +25,15 @@ func (sock Socket) Read() ([]byte, error) {
 }
 
 func main() {
+	serial := flag.Bool("serial", false, "use serial port to talk to sensor node")
+	device := flag.String("device", "", "serial device to use")
+	flag.Parse()
+
+	if *serial && *device == "" {
+		fmt.Println("no serial device provided")
+		os.Exit(1)
+	}
+
 	c_sock, _ := zmq.NewSocket(zmq.REP)
 	defer c_sock.Close()
 	c_sock.Bind("tcp://*:5555")
@@ -38,8 +49,7 @@ func main() {
 	dl_chan := make(chan []byte)
 	ul_chan := make(chan []byte)
 
-	go work.EmulCoordNode(dl_chan, ul_chan)
-	// go work.DoSerial(dl_chan, ul_chan) // NOT YET TRIED
+	go work.EmulCoordNode(dl_chan, ul_chan, *serial, *device)
 
 	data_ch := utils.MakeChannel(Socket{d_dl_sock})
 	cmd_ch := utils.MakeChannel(Socket{c_sock})

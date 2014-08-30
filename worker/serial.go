@@ -9,8 +9,8 @@ import (
 	"os"
 )
 
-func DoSerial(dl_chan, ul_chan chan []byte) {
-	c := &serial.Config{Name: "/dev/tty0", Baud: 57600}
+func DoSerial(dl_chan, ul_chan chan Message, device string) {
+	c := &serial.Config{Name: device, Baud: 9600}
 	s, err := serial.OpenPort(c)
 	if err != nil {
 		fmt.Println("error opening serial interface:", err.Error())
@@ -22,7 +22,7 @@ func DoSerial(dl_chan, ul_chan chan []byte) {
 	go write_to_serial(dl_chan, s)
 }
 
-func read_from_serial(s io.ReadWriteCloser, ul_chan chan []byte) {
+func read_from_serial(s io.ReadWriteCloser, ul_chan chan Message) {
 	for {
 		buf := make([]byte, 128)
 		n, err := s.Read(buf)
@@ -30,14 +30,16 @@ func read_from_serial(s io.ReadWriteCloser, ul_chan chan []byte) {
 			fmt.Println("error reading from serial:", err.Error())
 			continue
 		}
-		ul_chan <- buf[:n]
+		send_msg := Message{1, buf[:n]}
+		ul_chan <- send_msg
 		fmt.Println("read from serial:", hex.EncodeToString(buf[:n]))
 	}
 }
 
-func write_to_serial(dl_chan chan []byte, s io.ReadWriteCloser) {
+func write_to_serial(dl_chan chan Message, s io.ReadWriteCloser) {
 	for {
-		buf := <-dl_chan
+		rcv_msg := <-dl_chan
+		buf := rcv_msg.msg
 		_, err := s.Write(buf)
 		if err != nil {
 			fmt.Println("error writing to serial:", err.Error())
