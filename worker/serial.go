@@ -4,65 +4,31 @@ package worker
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/herrfz/gowdc/utils"
 	"github.com/tarm/goserial"
 	"io"
 	"os"
 	"time"
 )
 
-func DoSerial(dl_chan, ul_chan chan Message, device string) {
-	c := &serial.Config{Name: device, Baud: 4800}
-	s, err := serial.OpenPort(c)
-	if err != nil {
-		fmt.Println("error opening serial interface:", err.Error())
-		os.Exit(1)
-	}
-	defer s.Close()
-
-	go write_to_serial(dl_chan, s)
-	go read_from_serial(s, ul_chan)
-	select {} // TODO: stop channel
+type Message struct {
+	id   int
+	size int
+	pkt  []byte
 }
 
-func write_to_serial(dl_chan chan Message, s io.ReadWriteCloser) {
-	// TODO: remove -------
-	xx := &serial.Config{Name: "/dev/ttys002", Baud: 4800}
-	uu, err := serial.OpenPort(xx)
-	if err != nil {
-		fmt.Println("error opening serial interface:", err.Error())
-		os.Exit(1)
-	}
-	// --------------------
-
-	for {
-		//rcv_msg := <-dl_chan
-		buf := []byte{0x01, 0x04, 0xde, 0xad, 0xbe, 0xef} // rcv_msg.msg
-		_, err := uu.Write(buf)                           // TODO s.Write(buf)
-		if err != nil {
-			fmt.Println("error writing to serial:", err.Error())
-			continue
-		}
-		fmt.Println("written to serial:", hex.EncodeToString(buf))
-		time.Sleep(5 * time.Second) // TODO: remove
-	}
+type SerialReader struct {
+	serial io.ReadWriteCloser
 }
 
-func read_from_serial(s io.ReadWriteCloser, ul_chan chan Message) {
-	temp := make([]byte, 1)
+func (s SerialReader) Read() ([]byte, error) {
+	return nil, nil
+}
+
+func (s SerialReader) ReadSerial() ([]byte, error) {
 	buf := make([]byte, 128)
-	for {
-		n, _ := s.Read(temp)
-		if n > 0 {
-			if temp[0] == byte(1) {
-				pktlen, _ := s.Read(buf)
-				fmt.Println("read from serial:", hex.EncodeToString(buf[1:pktlen])) // 1st byte is len, not needed
-			}
-		} else {
-			continue
-		}
-		//send_msg := Message{1, buf[:n]}
-		//ul_chan <- send_msg
-	}
+	pktlen, _ := s.serial.Read(buf)
+	return buf[:pktlen], nil
 }
 
 func calc_checksum(data []byte) byte {
@@ -71,4 +37,63 @@ func calc_checksum(data []byte) byte {
 		csum ^= data[i]
 	}
 	return csum
+}
+
+// FOR LOOPBACK TESTING ONLY, uses /dev/ttys002 for writing, exits when device not available
+func test_write_serial(dl_chan chan []byte, s io.ReadWriteCloser) {
+	c := &serial.Config{Name: "/dev/ttys002", Baud: 4800}
+	s, err := serial.OpenPort(c)
+	if err != nil {
+		fmt.Println("error opening serial interface:", err.Error())
+		return
+	}
+	defer s.Close()
+
+	for {
+		buf := []byte{0x01, 0x04, 0xde, 0xad, 0xbe, 0xef}
+		_, err := s.Write(buf)
+		if err != nil {
+			fmt.Println("error writing to serial:", err.Error())
+			continue
+		}
+		fmt.Println("written to serial:", hex.EncodeToString(buf))
+		time.Sleep(5 * time.Second)
+	}
+}
+
+// main goroutine loop
+func DoSerial(dl_chan, ul_chan chan []byte, device string) {
+	c := &serial.Config{Name: device, Baud: 4800}
+	s, err := serial.OpenPort(c)
+	if err != nil {
+		fmt.Println("error opening serial interface:", err.Error())
+		os.Exit(1)
+	}
+	defer s.Close()
+
+	// if handshake, do it here, continue only when successful
+
+	serial := SerialReader{s}
+	rxch := utils.MakeSerialChannel(serial)
+
+	go test_write_serial(dl_chan, s)
+
+	for {
+		select {
+		case buf := <-rxch:
+			switch buf[0] {
+			case 0x01:
+				//ul_chan <- buf
+				fmt.Println("read from serial:", hex.EncodeToString(buf[2:])) // 1st and 2nd bytes are header
+
+			case 0x02:
+				// TODO: handle other message types
+
+			}
+
+		case buf := <-dl_chan:
+			s.Write(buf)
+			fmt.Println("written to serial:", hex.EncodeToString(buf))
+		}
+	}
 }

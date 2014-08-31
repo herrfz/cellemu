@@ -24,6 +24,10 @@ func (sock Socket) Read() ([]byte, error) {
 	return []byte(buf), err
 }
 
+func (sock Socket) ReadSerial() ([]byte, error) {
+	return nil, nil
+}
+
 func main() {
 	serial := flag.Bool("serial", false, "use serial port to talk to sensor node")
 	device := flag.String("device", "", "serial device to use")

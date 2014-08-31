@@ -10,11 +10,6 @@ import (
 	msg "github.com/herrfz/gowdc/messages"
 )
 
-type Message struct {
-	id  int
-	msg []byte
-}
-
 func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 	var MSDULEN int
 	var MSDU []byte
@@ -22,8 +17,8 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 	var NIK, S, AK, SIK, SCK []byte
 	var DSTADDR []byte
 
-	serial_dl_chan := make(chan Message)
-	serial_ul_chan := make(chan Message)
+	serial_dl_chan := make(chan []byte)
+	serial_ul_chan := make(chan []byte)
 	if serial {
 		go DoSerial(serial_dl_chan, serial_ul_chan, device)
 	}
@@ -128,16 +123,10 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 			case 0x01:
 				if serial {
 					MPDU := MakeRequest(DSTPAN, DSTADDR, []byte{0xff, 0xff}, []byte{0xff, 0xff}, MSDU)
-					send_msg := Message{1, MPDU}
-					serial_dl_chan <- send_msg
-					rcv_msg := <-serial_ul_chan
-					if rcv_msg.id == 1 {
-						PSDU := rcv_msg.msg
-						IND := MakeWDCInd(PSDU, trail)
-						ul_chan <- IND
-					} else {
-						ul_chan <- rcv_msg.msg // TODO
-					}
+					serial_dl_chan <- MPDU
+					PSDU := <-serial_ul_chan
+					IND := MakeWDCInd(PSDU, trail)
+					ul_chan <- IND
 					continue
 				}
 
@@ -176,16 +165,10 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 			case 0x03, 0x05:
 				if serial {
 					MPDU := MakeRequest(DSTPAN, DSTADDR, []byte{0xff, 0xff}, []byte{0xff, 0xff}, MSDU)
-					send_msg := Message{1, MPDU}
-					serial_dl_chan <- send_msg
-					rcv_msg := <-serial_ul_chan
-					if rcv_msg.id == 1 {
-						PSDU := rcv_msg.msg
-						IND := MakeWDCInd(PSDU, trail)
-						ul_chan <- IND
-					} else {
-						ul_chan <- rcv_msg.msg // TODO
-					}
+					serial_dl_chan <- MPDU
+					PSDU := <-serial_ul_chan
+					IND := MakeWDCInd(PSDU, trail)
+					ul_chan <- IND
 					continue
 				}
 
