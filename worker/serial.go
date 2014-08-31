@@ -35,11 +35,7 @@ type SerialReader struct {
 	serial io.ReadWriteCloser
 }
 
-func (s SerialReader) Read() ([]byte, error) {
-	return nil, nil
-}
-
-func (s SerialReader) ReadSerial() ([]byte, error) {
+func (s SerialReader) ReadDevice() ([]byte, error) {
 	buf := make([]byte, 128)
 	msglen, _ := s.serial.Read(buf)
 	return buf[:msglen], nil
@@ -89,7 +85,7 @@ func DoSerial(dl_chan, ul_chan chan []byte, device string) {
 	// if handshake, do it here, continue only when successful
 
 	serial := SerialReader{s}
-	rxch := utils.MakeSerialChannel(serial)
+	rxch := utils.MakeChannel(serial)
 
 	go test_write_serial(dl_chan, s)
 

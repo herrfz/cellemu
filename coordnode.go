@@ -13,7 +13,7 @@ type Socket struct {
 	socket *zmq.Socket
 }
 
-func (sock Socket) Read() ([]byte, error) {
+func (sock Socket) ReadDevice() ([]byte, error) {
 	buf, err := sock.socket.Recv(0)
 	if err != nil {
 		if err.Error() == "Operation cannot be accomplished in current state" {
@@ -22,10 +22,6 @@ func (sock Socket) Read() ([]byte, error) {
 		}
 	}
 	return []byte(buf), err
-}
-
-func (sock Socket) ReadSerial() ([]byte, error) {
-	return nil, nil
 }
 
 func main() {
