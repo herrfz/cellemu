@@ -24,7 +24,17 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 	}
 
 	for {
-		buf := <-dl_chan
+		buf, more := <-dl_chan
+
+		if !more {
+			fmt.Println("stopping CoordNode emulator...")
+			if serial {
+				close(serial_dl_chan)
+				<-serial_ul_chan
+			}
+			ul_chan <- []byte{0xff, 0xff}
+			break // stop goroutine no more data
+		}
 
 		if len(buf) == 0 {
 			dummy := make([]byte, 0)
@@ -268,4 +278,6 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 			ul_chan <- msg.WDC_ERROR
 		}
 	}
+
+	fmt.Println("CoordNode emulator stopped")
 }

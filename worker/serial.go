@@ -38,7 +38,11 @@ type SerialReader struct {
 func (s SerialReader) ReadDevice() ([]byte, error) {
 	buf := make([]byte, 128)
 	msglen, _ := s.serial.Read(buf)
-	return buf[:msglen], nil
+	if msglen > 0 {
+		return buf[:msglen], nil
+	} else {
+		return []byte{}, nil
+	}
 }
 
 func calc_checksum(data []byte) byte {
@@ -50,7 +54,7 @@ func calc_checksum(data []byte) byte {
 }
 
 // FOR LOOPBACK TESTING ONLY, uses /dev/ttys002 for writing, exits when device not available
-func test_write_serial(dl_chan chan []byte, s io.ReadWriteCloser) {
+func test_write_serial(stopch chan bool, dl_chan chan []byte, s io.ReadWriteCloser) {
 	c := &serial.Config{Name: "/dev/ttys002", Baud: 4800}
 	s, err := serial.OpenPort(c)
 	if err != nil {
@@ -59,17 +63,25 @@ func test_write_serial(dl_chan chan []byte, s io.ReadWriteCloser) {
 	}
 	defer s.Close()
 
+LOOP:
 	for {
-		msg := Message{id: 1, data: []byte{0xde, 0xad, 0xbe, 0xef}}
-		buf := msg.GenerateMessage()
-		_, err := s.Write(buf)
-		if err != nil {
-			fmt.Println("error writing to serial:", err.Error())
-			continue
+		select {
+		case <-stopch:
+			break LOOP
+
+		default:
+			msg := Message{id: 1, data: []byte{0xde, 0xad, 0xbe, 0xef}}
+			buf := msg.GenerateMessage()
+			_, err := s.Write(buf)
+			if err != nil {
+				fmt.Println("error writing to serial:", err.Error())
+				continue
+			}
+			fmt.Println("written to serial:", hex.EncodeToString(buf))
+			time.Sleep(5 * time.Second)
 		}
-		fmt.Println("written to serial:", hex.EncodeToString(buf))
-		time.Sleep(5 * time.Second)
 	}
+	fmt.Println("test_write_serial stopped")
 }
 
 // main goroutine loop
@@ -87,8 +99,10 @@ func DoSerial(dl_chan, ul_chan chan []byte, device string) {
 	serial := SerialReader{s}
 	rxch := utils.MakeChannel(serial)
 
-	go test_write_serial(dl_chan, s)
+	stopch := make(chan bool)
+	go test_write_serial(stopch, dl_chan, s)
 
+LOOP:
 	for {
 		select {
 		case buf := <-rxch:
@@ -102,11 +116,18 @@ func DoSerial(dl_chan, ul_chan chan []byte, device string) {
 
 			}
 
-		case data := <-dl_chan:
+		case data, more := <-dl_chan:
+			if !more {
+				fmt.Println("stopping serial worker...")
+				stopch <- true
+				ul_chan <- []byte{0xff, 0xff}
+				break LOOP
+			}
 			msg := Message{id: 1, data: data}
 			buf := msg.GenerateMessage()
 			s.Write(buf)
 			fmt.Println("written to serial:", hex.EncodeToString(buf))
 		}
 	}
+	fmt.Println("serial worker stopped")
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/herrfz/gowdc/utils"
 	zmq "github.com/pebbe/zmq4"
 	"os"
+	"os/signal"
 )
 
 type Socket struct {
@@ -34,6 +35,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt)
+
 	c_sock, _ := zmq.NewSocket(zmq.REP)
 	defer c_sock.Close()
 	c_sock.Bind("tcp://*:5555")
@@ -54,6 +58,7 @@ func main() {
 	data_ch := utils.MakeChannel(Socket{d_dl_sock})
 	cmd_ch := utils.MakeChannel(Socket{c_sock})
 
+LOOP:
 	for {
 		select {
 		case d1 := <-cmd_ch:
@@ -71,6 +76,12 @@ func main() {
 		case d3 := <-ul_chan:
 			d_ul_sock.Send(string(d3), 0)
 			fmt.Println("sent node uplink message")
+
+		case <-c:
+			close(dl_chan)
+			<-ul_chan
+			break LOOP
 		}
 	}
+	fmt.Println("Program stopped")
 }
