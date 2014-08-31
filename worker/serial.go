@@ -13,8 +13,22 @@ import (
 
 type Message struct {
 	id   int
-	size int
-	pkt  []byte
+	data []byte
+}
+
+func (msg *Message) GenerateMessage() []byte {
+	csum := calc_checksum(msg.data)
+	msg.data = append(msg.data, csum)
+	// length is defined only on payload and checksum
+	// id and length itself are not counted
+	msglen := len(msg.data)
+
+	buf := make([]byte, msglen+2) // add 2 for id and len
+	buf[0] = byte(msg.id)
+	buf[1] = byte(msglen)
+	copy(buf[2:], msg.data)
+
+	return buf
 }
 
 type SerialReader struct {
@@ -27,8 +41,8 @@ func (s SerialReader) Read() ([]byte, error) {
 
 func (s SerialReader) ReadSerial() ([]byte, error) {
 	buf := make([]byte, 128)
-	pktlen, _ := s.serial.Read(buf)
-	return buf[:pktlen], nil
+	msglen, _ := s.serial.Read(buf)
+	return buf[:msglen], nil
 }
 
 func calc_checksum(data []byte) byte {
@@ -50,7 +64,8 @@ func test_write_serial(dl_chan chan []byte, s io.ReadWriteCloser) {
 	defer s.Close()
 
 	for {
-		buf := []byte{0x01, 0x04, 0xde, 0xad, 0xbe, 0xef}
+		msg := Message{id: 1, data: []byte{0xde, 0xad, 0xbe, 0xef}}
+		buf := msg.GenerateMessage()
 		_, err := s.Write(buf)
 		if err != nil {
 			fmt.Println("error writing to serial:", err.Error())
@@ -91,7 +106,9 @@ func DoSerial(dl_chan, ul_chan chan []byte, device string) {
 
 			}
 
-		case buf := <-dl_chan:
+		case data := <-dl_chan:
+			msg := Message{id: 1, data: data}
+			buf := msg.GenerateMessage()
 			s.Write(buf)
 			fmt.Println("written to serial:", hex.EncodeToString(buf))
 		}
