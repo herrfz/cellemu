@@ -53,12 +53,13 @@ func calc_checksum(data []byte) byte {
 	return csum
 }
 
-// FOR LOOPBACK TESTING ONLY, uses /dev/ttys002 for writing, exits when device not available
+// FOR LOOPBACK TESTING ONLY, simply exits when device not available
 func test_write_serial(stopch chan bool, dl_chan chan []byte, s io.ReadWriteCloser) {
 	c := &serial.Config{Name: "/dev/ttys002", Baud: 9600}
 	s, err := serial.OpenPort(c)
 	if err != nil {
-		fmt.Println("error opening serial interface:", err.Error())
+		fmt.Println("error opening loopback test serial interface:", err.Error())
+		close(stopch)
 		return
 	}
 	defer s.Close()
@@ -108,10 +109,17 @@ LOOP:
 		case data, more := <-dl_chan:
 			if !more {
 				fmt.Println("stopping serial worker...")
-				stopch <- true
+				select {
+				case <-stopch: // stop channel is closed, no test writer is running
+					break
+				default:
+					stopch <- true
+				}
+
 				ul_chan <- []byte{0xff, 0xff}
 				break LOOP
 			}
+
 			msg := Message{id: 1, data: data}
 			buf := msg.GenerateMessage()
 			s.Write(buf)
