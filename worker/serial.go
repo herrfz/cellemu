@@ -70,16 +70,11 @@ LOOP:
 		case <-stopch:
 			break LOOP
 
-		default:
+		case <-time.After(5 * time.Second):
 			msg := Message{id: 1, data: []byte{0xde, 0xad, 0xbe, 0xef}}
 			buf := msg.GenerateMessage()
-			_, err := s.Write(buf)
-			if err != nil {
-				fmt.Println("error writing to serial:", err.Error())
-				continue
-			}
+			s.Write(buf)
 			fmt.Println("written to serial:", hex.EncodeToString(buf))
-			time.Sleep(5 * time.Second)
 		}
 	}
 	fmt.Println("test_write_serial stopped")
