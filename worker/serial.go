@@ -55,7 +55,7 @@ func calc_checksum(data []byte) byte {
 
 // FOR LOOPBACK TESTING ONLY, uses /dev/ttys002 for writing, exits when device not available
 func test_write_serial(stopch chan bool, dl_chan chan []byte, s io.ReadWriteCloser) {
-	c := &serial.Config{Name: "/dev/ttys002", Baud: 4800}
+	c := &serial.Config{Name: "/dev/ttys002", Baud: 9600}
 	s, err := serial.OpenPort(c)
 	if err != nil {
 		fmt.Println("error opening serial interface:", err.Error())
@@ -105,17 +105,6 @@ func DoSerial(dl_chan, ul_chan chan []byte, device string) {
 LOOP:
 	for {
 		select {
-		case buf := <-rxch:
-			switch buf[0] {
-			case 0x01:
-				//ul_chan <- buf
-				fmt.Println("read from serial:", hex.EncodeToString(buf[2:])) // 1st and 2nd bytes are header
-
-			case 0x02:
-				// TODO: handle other message types
-
-			}
-
 		case data, more := <-dl_chan:
 			if !more {
 				fmt.Println("stopping serial worker...")
@@ -127,6 +116,19 @@ LOOP:
 			buf := msg.GenerateMessage()
 			s.Write(buf)
 			fmt.Println("written to serial:", hex.EncodeToString(buf))
+
+		case buf := <-rxch:
+			switch buf[0] {
+			case 0x01:
+				//ul_chan <- buf
+				fmt.Println("read from serial:", hex.EncodeToString(buf[2:])) // 1st and 2nd bytes are header
+
+			case 0x02:
+				// TODO: handle other message types
+
+			}
+
+		
 		}
 	}
 	fmt.Println("serial worker stopped")
