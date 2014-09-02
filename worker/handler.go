@@ -153,7 +153,8 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 				fmt.Println("shared secret:", hex.EncodeToString(zz))
 				zz_h := sha256.Sum256(zz)
 				NIK = zz_h[:16] // NIK := first 128 bits / 16 Bytes of the hash of the secret
-				fmt.Println("generated NIK:", hex.EncodeToString(NIK))
+				fmt.Println("For sensor address:", hex.EncodeToString(DSTADDR),
+					"generated NIK:", hex.EncodeToString(NIK))
 
 				// construct WDC_MAC_DATA_IND return message
 				MHR := []byte{0x01, 0x88, // FCF, (see Emeric's noserial.patch)
@@ -240,13 +241,15 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 						dbp...)...)
 					S = KEYS[:16]
 					AK = KEYS[16:]
-					fmt.Println("created LTSS:", hex.EncodeToString(S), hex.EncodeToString(AK))
+					fmt.Println("For sensor address:", hex.EncodeToString(DSTADDR),
+						"created LTSS:", hex.EncodeToString(S), hex.EncodeToString(AK))
 				} else {
 					MPDU = append(MHR, append([]byte{0x06}, // mID session key response
 						dbp...)...)
 					SIK = KEYS[:16]
 					SCK = KEYS[16:]
-					fmt.Println("created session keys:", hex.EncodeToString(SIK), hex.EncodeToString(SCK))
+					fmt.Println("For sensor address:", hex.EncodeToString(DSTADDR),
+						"created session keys:", hex.EncodeToString(SIK), hex.EncodeToString(SCK))
 				}
 
 				mac = hmac.New(sha256.New, authkey)

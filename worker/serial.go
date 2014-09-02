@@ -121,6 +121,10 @@ LOOP:
 			fmt.Println("written to serial:", hex.EncodeToString(buf))
 
 		case buf := <-rxch:
+			if len(buf) == 0 {
+				continue
+			}
+
 			switch buf[0] {
 			case 0x01:
 				//ul_chan <- buf
@@ -130,8 +134,6 @@ LOOP:
 				// TODO: handle other message types
 
 			}
-
-		
 		}
 	}
 	fmt.Println("serial worker stopped")
