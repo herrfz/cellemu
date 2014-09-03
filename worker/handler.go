@@ -334,7 +334,11 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 					continue
 				}
 
-				sbk, _ := blockcipher.AESDecryptCBC(SCK, MSDU_NOMAC) // TODO: handle PKCS#7 padding, handle error
+				sbk, err := blockcipher.AESDecryptCBCPKCS7(SCK, MSDU_NOMAC) // PKCS#7 handling not yet tested
+				if err != nil {
+					fmt.Println("error decrypting SBK:", err.Error())
+					continue
+				}
 				fmt.Println("Got SBK:", hex.EncodeToString(sbk))
 
 				// construct WDC_MAC_DATA_IND return message
