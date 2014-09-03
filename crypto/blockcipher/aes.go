@@ -3,6 +3,7 @@ package blockcipher
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"fmt"
 )
 
 // decrypt AES-CBC plaintext
@@ -17,6 +18,10 @@ func AESDecryptCBC(key, ciphertext []byte) ([]byte, error) {
 	iv := tmp_ct[:aes.BlockSize]
 	pt := tmp_ct[aes.BlockSize:]
 
+	if len(pt)%aes.BlockSize != 0 {
+		return nil, fmt.Errorf("ciphertext length is not a multiple of AES block")
+	}
+
 	cbc := cipher.NewCBCDecrypter(c, iv)
 	cbc.CryptBlocks(pt, pt)
 	return pt, nil
@@ -29,6 +34,16 @@ func AESDecryptCBCPKCS7(key, ciphertext []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	padlen := int(pt[len(pt)])
+	padlen := int(pt[len(pt)-1])
+
+	padcheck := byte(0x00)
+	for i := len(pt) - 1; i < len(pt)-padlen; i-- {
+		padcheck |= pt[i] ^ byte(padlen)
+	}
+	// take care of padding oracle!
+	if padcheck != 0x00 {
+		return nil, fmt.Errorf("incorrect padding format")
+	}
+
 	return pt[:len(pt)-padlen], nil
 }
