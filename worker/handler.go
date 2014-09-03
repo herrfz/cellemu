@@ -6,9 +6,20 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"github.com/herrfz/coordnode/crypto/blockcipher"
 	"github.com/herrfz/coordnode/crypto/ecdh"
 	msg "github.com/herrfz/gowdc/messages"
+	"time"
 )
+
+func receive_with_timeout (channel chan []byte, timeout time.Duration) ([]byte, error) {
+	select {
+	case buf := <-channel:
+		return buf, nil
+	case <-time.After(timeout * time.Second):
+		return []byte{}, fmt.Errorf("timeout while receiving message")
+	}
+}
 
 func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 	var MSDULEN int
@@ -16,6 +27,9 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 
 	var NIK, S, AK, SIK, SCK []byte
 	var DSTADDR []byte
+
+	var TIMEOUT time.Duration
+	TIMEOUT = 10
 
 	serial_dl_chan := make(chan []byte)
 	serial_ul_chan := make(chan []byte)
@@ -127,14 +141,21 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 
 			mID := MSDU[0]
 			switch mID {
+			// application data
 			case 0x09, 0x0A:
 				// do nothing
 				continue
+
+			// generate NIK
 			case 0x01:
 				if serial {
 					MPDU := MakeRequest(DSTPAN, DSTADDR, []byte{0xff, 0xff}, []byte{0xff, 0xff}, MSDU)
 					serial_dl_chan <- MPDU
-					PSDU := <-serial_ul_chan
+					PSDU, err := receive_with_timeout(serial_ul_chan, TIMEOUT)
+					if err != nil {
+						fmt.Println("error reading from serial:", err.Error())
+						continue
+					}
 					IND := MakeWDCInd(PSDU, trail)
 					ul_chan <- IND
 					continue
@@ -173,11 +194,16 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 				ul_chan <- IND
 				fmt.Println("sent WDC_MAC_DATA_IND:", hex.EncodeToString(IND))
 
+			// generate LTSS or generate session keys
 			case 0x03, 0x05:
 				if serial {
 					MPDU := MakeRequest(DSTPAN, DSTADDR, []byte{0xff, 0xff}, []byte{0xff, 0xff}, MSDU)
 					serial_dl_chan <- MPDU
-					PSDU := <-serial_ul_chan
+					PSDU, err := receive_with_timeout(serial_ul_chan, TIMEOUT)
+					if err != nil {
+						fmt.Println("error reading from serial:", err.Error())
+						continue
+					}
 					IND := MakeWDCInd(PSDU, trail)
 					ul_chan <- IND
 					continue
@@ -266,8 +292,72 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 				ul_chan <- IND
 				fmt.Println("sent WDC_MAC_DATA_IND:", hex.EncodeToString(IND))
 
-			case 0x0B:
-				// sbk
+			// update SBK
+			case 0x07:
+				if serial {
+					MPDU := MakeRequest(DSTPAN, DSTADDR, []byte{0xff, 0xff}, []byte{0xff, 0xff}, MSDU)
+					serial_dl_chan <- MPDU
+					PSDU, err := receive_with_timeout(serial_ul_chan, TIMEOUT)
+					if err != nil {
+						fmt.Println("error reading from serial:", err.Error())
+						continue
+					}
+					IND := MakeWDCInd(PSDU, trail)
+					ul_chan <- IND
+					continue
+				}
+
+				msgMAC := MSDU[MSDULEN-8:] // msgMAC := last 8 Bytes of MSDU
+				MSDU_NOMAC := make([]byte, MSDULEN-8)
+				copy(MSDU_NOMAC, MSDU[:MSDULEN-8])
+
+				// construct WDC_MAC_DATA_REQ for which the msgMAC is computed
+				MHR := []byte{0x01, 0x88, // FCF, (see Emeric's noserial.patch)
+					0x00} // sequence number, must be set to zero
+				sensor_addr := append(DSTPAN, DSTADDR...)
+				wdc_addr := []byte{0xff, 0xff, // WDC PAN
+					0xff, 0xff} // WDC address
+
+				MHR = append(MHR, append(sensor_addr, wdc_addr...)...)
+
+				MPDU := append(MHR, MSDU_NOMAC...)
+
+				mac := hmac.New(sha256.New, SIK)
+				mac.Write(MPDU)
+				sha256_mac := mac.Sum(nil)
+				expectedMAC := make([]byte, 8)
+				copy(expectedMAC, sha256_mac[:8]) // truncate to first 8 Bytes
+				if !hmac.Equal(msgMAC, expectedMAC) {
+					// MAC verification fails, drop
+					fmt.Printf("failed MAC verification, MPDU: %s, key: %s, expectedMAC: %s\n",
+						hex.EncodeToString(MPDU), hex.EncodeToString(SIK), hex.EncodeToString(expectedMAC))
+					continue
+				}
+
+				sbk, _ := blockcipher.AESDecryptCBC(SCK, MSDU_NOMAC) // TODO: handle PKCS#7 padding, handle error
+				fmt.Println("Got SBK:", hex.EncodeToString(sbk))
+
+				// construct WDC_MAC_DATA_IND return message
+				MHR = []byte{0x01, 0x88, // FCF, (see Emeric's noserial.patch)
+					0x00} // sequence number, must be set to zero
+				MHR = append(MHR, append(wdc_addr, sensor_addr...)...)
+				MPDU = append(MHR, append([]byte{0x08}, // mID SBK update response
+					byte(0x00))...) // status 0x00: OK
+
+				mac = hmac.New(sha256.New, SIK)
+				mac.Write(MPDU)
+				sha256_mac = mac.Sum(nil)
+				copy(msgMAC, sha256_mac[:8]) // truncate to first 8 Bytes
+
+				MFR := []byte{0xde, 0xad} // FCS, 16-bit CRC <--fake
+
+				PSDU := append(MPDU, append(msgMAC, MFR...)...)
+
+				IND := MakeWDCInd(PSDU, trail)
+
+				ul_chan <- IND
+				fmt.Println("sent WDC_MAC_DATA_IND:", hex.EncodeToString(IND))
+
 			default:
 				fmt.Println("received wrong mID")
 				// drop
