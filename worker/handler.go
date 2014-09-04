@@ -124,7 +124,7 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 				MSDU = buf[15:]
 			}
 			if MSDULEN != len(MSDU) {
-				// TODO, currently drop
+				fmt.Println("MSDU length mismatch, on frame:", MSDULEN, ", received:", len(MSDU))
 				continue
 			}
 
@@ -334,12 +334,13 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 					continue
 				}
 
-				sbk, err := blockcipher.AESDecryptCBCPKCS7(SCK, MSDU_NOMAC) // PKCS#7 handling not yet tested
+				sbk, err := blockcipher.AESDecryptCBCPKCS7(SCK, MSDU_NOMAC[1:])
 				if err != nil {
 					fmt.Println("error decrypting SBK:", err.Error())
 					continue
 				}
-				fmt.Println("Got SBK:", hex.EncodeToString(sbk))
+				fmt.Println("For sensor address:", hex.EncodeToString(DSTADDR),
+					"got SBK:", hex.EncodeToString(sbk))
 
 				// construct WDC_MAC_DATA_IND return message
 				MHR = []byte{0x01, 0x88, // FCF, (see Emeric's noserial.patch)

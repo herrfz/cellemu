@@ -3,6 +3,7 @@ package blockcipher
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"encoding/hex"
 	"fmt"
 )
 
@@ -19,7 +20,8 @@ func AESDecryptCBC(key, ciphertext []byte) ([]byte, error) {
 	pt := tmp_ct[aes.BlockSize:]
 
 	if len(pt)%aes.BlockSize != 0 {
-		return nil, fmt.Errorf("ciphertext length is not a multiple of AES block")
+		return nil, fmt.Errorf("ciphertext length is not a multiple of AES block: %s",
+			hex.EncodeToString(pt))
 	}
 
 	cbc := cipher.NewCBCDecrypter(c, iv)
