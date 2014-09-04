@@ -36,12 +36,12 @@ func AESDecryptCBCPKCS7(key, ciphertext []byte) ([]byte, error) {
 
 	padlen := int(pt[len(pt)-1])
 
+	// verify correct padding format; beware of padding oracle when doing this!
+	// always encrypt-then-authenticate (i.e. authenticate-then-decrypt)!!
 	padcheck := byte(0x00)
-	for i := len(pt) - 1; i < len(pt)-padlen; i-- {
+	for i := len(pt) - padlen; i < len(pt); i++ {
 		padcheck |= pt[i] ^ byte(padlen)
 	}
-	// beware of padding oracle when doing this!
-	// always encrypt-then-authenticate (i.e. authenticate-then-decrypt)!!
 	if padcheck != 0x00 {
 		return nil, fmt.Errorf("incorrect padding format")
 	}

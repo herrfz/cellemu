@@ -62,8 +62,8 @@ func TestAESDecryptCBC(t *testing.T) {
 		ct, _ := hex.DecodeString(pair.ct)
 		pt, _ := hex.DecodeString(pair.pt)
 		cipher := append(iv, ct...)
-		if plain, _ := AESDecryptCBC(key, cipher); bytes.Equal(plain, pt) {
-			t.Error("expected:", hex.EncodeToString(pt), "got:", hex.EncodeToString(plain))
+		if plain, err := AESDecryptCBC(key, cipher); err == nil {
+			t.Error("expected error, got nil, expected:", hex.EncodeToString(pt), "decrypted plaintext", hex.EncodeToString(plain))
 		}
 	}
 }
