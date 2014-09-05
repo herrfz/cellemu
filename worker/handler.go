@@ -143,8 +143,11 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 			switch mID {
 			// application data
 			case 0x09, 0x0A:
-				// do nothing
-				continue
+				if serial {
+					MPDU := MakeRequest(DSTPAN, DSTADDR, []byte{0xff, 0xff}, []byte{0xff, 0xff}, MSDU)
+					serial_dl_chan <- MPDU
+					continue
+				}
 
 			// generate NIK
 			case 0x01:
