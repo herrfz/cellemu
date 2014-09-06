@@ -9,17 +9,7 @@ import (
 	"github.com/herrfz/coordnode/crypto/blockcipher"
 	"github.com/herrfz/coordnode/crypto/ecdh"
 	msg "github.com/herrfz/gowdc/messages"
-	"time"
 )
-
-func receive_with_timeout (channel chan []byte, timeout time.Duration) ([]byte, error) {
-	select {
-	case buf := <-channel:
-		return buf, nil
-	case <-time.After(timeout * time.Second):
-		return []byte{}, fmt.Errorf("timeout while receiving message")
-	}
-}
 
 func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 	var MSDULEN int
@@ -28,13 +18,25 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 	var NIK, S, AK, SIK, SCK []byte
 	var DSTADDR []byte
 
-	var TIMEOUT time.Duration
-	TIMEOUT = 10
+	// trailing LQI, ED, RX status, RX slot; TODO, all zeros for now
+	// I have to add one 0x00 to remove server error!! why!!
+	var trail = []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 
 	serial_dl_chan := make(chan []byte)
 	serial_ul_chan := make(chan []byte)
 	if serial {
 		go DoSerial(serial_dl_chan, serial_ul_chan, device)
+		go func() { // serial uplink listener goroutine
+			for {
+				PSDU, more := <-serial_ul_chan
+				if !more {
+					fmt.Println("serial uplink listener stopped")
+					break
+				}
+				IND := MakeWDCInd(PSDU, trail)
+				ul_chan <- IND
+			}
+		}()
 	}
 
 	for {
@@ -46,7 +48,7 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 				close(serial_dl_chan)
 				<-serial_ul_chan
 			}
-			ul_chan <- []byte{0xff, 0xff}
+			close(ul_chan)
 			break // stop goroutine no more data
 		}
 
@@ -135,10 +137,6 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 			fmt.Println("sent data confirmation",
 				hex.EncodeToString(msg.WDC_MAC_DATA_CON))
 
-			// trailing LQI, ED, RX status, RX slot; TODO, all zeros for now
-			// I have to add one 0x00 to remove server error!! why!!
-			trail := []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
-
 			mID := MSDU[0]
 			switch mID {
 			// application data
@@ -154,13 +152,6 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 				if serial {
 					MPDU := MakeRequest(DSTPAN, DSTADDR, []byte{0xff, 0xff}, []byte{0xff, 0xff}, MSDU)
 					serial_dl_chan <- MPDU
-					PSDU, err := receive_with_timeout(serial_ul_chan, TIMEOUT)
-					if err != nil {
-						fmt.Println("error reading from serial:", err.Error())
-						continue
-					}
-					IND := MakeWDCInd(PSDU, trail)
-					ul_chan <- IND
 					continue
 				}
 
@@ -202,13 +193,6 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 				if serial {
 					MPDU := MakeRequest(DSTPAN, DSTADDR, []byte{0xff, 0xff}, []byte{0xff, 0xff}, MSDU)
 					serial_dl_chan <- MPDU
-					PSDU, err := receive_with_timeout(serial_ul_chan, TIMEOUT)
-					if err != nil {
-						fmt.Println("error reading from serial:", err.Error())
-						continue
-					}
-					IND := MakeWDCInd(PSDU, trail)
-					ul_chan <- IND
 					continue
 				}
 
@@ -300,13 +284,6 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 				if serial {
 					MPDU := MakeRequest(DSTPAN, DSTADDR, []byte{0xff, 0xff}, []byte{0xff, 0xff}, MSDU)
 					serial_dl_chan <- MPDU
-					PSDU, err := receive_with_timeout(serial_ul_chan, TIMEOUT)
-					if err != nil {
-						fmt.Println("error reading from serial:", err.Error())
-						continue
-					}
-					IND := MakeWDCInd(PSDU, trail)
-					ul_chan <- IND
 					continue
 				}
 
