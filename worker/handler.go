@@ -2,12 +2,12 @@
 package worker
 
 import (
-	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"github.com/herrfz/coordnode/crypto/blockcipher"
 	"github.com/herrfz/coordnode/crypto/ecdh"
+	"github.com/herrfz/coordnode/crypto/hmac"
 	msg "github.com/herrfz/gowdc/messages"
 )
 
@@ -28,11 +28,11 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 		go DoSerial(serial_dl_chan, serial_ul_chan, device)
 		go func() { // serial uplink listener goroutine
 			for {
-				PSDU, more := <-serial_ul_chan
+				MPDU, more := <-serial_ul_chan
 				if !more {
 					break
 				}
-				IND := MakeWDCInd(PSDU, trail)
+				IND := MakeWDCInd(MPDU, trail)
 				ul_chan <- IND
 			}
 			fmt.Println("serial uplink listener stopped")
@@ -87,8 +87,7 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 			fmt.Println("WDC sync-ed")
 
 		case 0x11: // start TDMA
-			fmt.Println("received start TDMA:",
-				hex.EncodeToString(buf))
+			fmt.Println("received start TDMA:", hex.EncodeToString(buf))
 			msg.WDC_GET_TDMA_RES[2] = 0x01 // running
 			copy(msg.WDC_GET_TDMA_RES[3:], buf[2:])
 			msg.WDC_ACK[1] = 0x12 // START_TDMA_REQ_ACK
@@ -105,12 +104,10 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 		case 0x15: // TDMA status
 			fmt.Println("received TDMA status request")
 			ul_chan <- msg.WDC_GET_TDMA_RES
-			fmt.Println("sent TDMA status response:",
-				hex.EncodeToString(msg.WDC_GET_TDMA_RES))
+			fmt.Println("sent TDMA status response:", hex.EncodeToString(msg.WDC_GET_TDMA_RES))
 
 		case 0x17: // data request
-			fmt.Println("received data request",
-				hex.EncodeToString(buf))
+			fmt.Println("received data request", hex.EncodeToString(buf))
 			// parse WDC_MAC_DATA_REQ, cf. EADS MAC Table 29
 			HANDLE := buf[2]
 			TXOPTS := buf[3]
@@ -134,8 +131,7 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 			msg.WDC_MAC_DATA_CON[2] = HANDLE
 			msg.WDC_MAC_DATA_CON[3] = 0x00 // success
 			ul_chan <- msg.WDC_MAC_DATA_CON
-			fmt.Println("sent data confirmation",
-				hex.EncodeToString(msg.WDC_MAC_DATA_CON))
+			fmt.Println("sent data confirmation", hex.EncodeToString(msg.WDC_MAC_DATA_CON))
 
 			// if connected to sensor node via serial, forward immediately
 			if serial {
@@ -162,24 +158,18 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 				dbp := ecdh.GeneratePublic(db)
 				zz, _ := ecdh.GenerateSecret(db, dap)
 				fmt.Println("shared secret:", hex.EncodeToString(zz))
+
 				zz_h := sha256.Sum256(zz)
 				NIK = zz_h[:16] // NIK := first 128 bits / 16 Bytes of the hash of the secret
 				fmt.Println("For sensor address:", hex.EncodeToString(DSTADDR),
 					"generated NIK:", hex.EncodeToString(NIK))
 
-				// construct WDC_MAC_DATA_IND return message
-				MHR := []byte{0x01, 0x88, // FCF, (see Emeric's noserial.patch)
-					0x00,       // sequence number, must be set to zero
-					0xff, 0xff, // WDC PAN
-					0xff, 0xff} // WDC address
-				MHR = append(MHR, append(DSTPAN, DSTADDR...)...)
+				// the MPDU of the return message
+				MPDU := MakeRequest([]byte{0xff, 0xff}, []byte{0xff, 0xff}, DSTPAN, DSTADDR,
+					append([]byte{0x02}, // mID NIK response
+						dbp...))
 
-				MFR := []byte{0xde, 0xad} // FCS, 16-bit CRC <--fake
-
-				PSDU := append(MHR, append([]byte{0x02}, // mID NIK response
-					append(dbp, MFR...)...)...)
-
-				IND := MakeWDCInd(PSDU, trail)
+				IND := MakeWDCInd(MPDU, trail)
 
 				ul_chan <- IND
 				fmt.Println("sent WDC_MAC_DATA_IND:", hex.EncodeToString(IND))
@@ -208,23 +198,17 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 
 				MPDU := append(MHR, MSDU_NOMAC...)
 
-				mac := hmac.New(sha256.New, authkey)
-				mac.Write(MPDU)
-				sha256_mac := mac.Sum(nil)
-				expectedMAC := make([]byte, 8)
-				copy(expectedMAC, sha256_mac[:8]) // truncate to first 8 Bytes
-				if !hmac.Equal(msgMAC, expectedMAC) {
+				if expectedMAC, match := hmac.SHA256HMACVerify(authkey, MPDU, msgMAC); !match {
 					// MAC verification fails, drop
-					fmt.Printf("failed MAC verification, MPDU: %s, key: %s, expectedMAC: %s\n",
-						hex.EncodeToString(MPDU), hex.EncodeToString(authkey), hex.EncodeToString(expectedMAC))
+					fmt.Println("failed MAC verification, MPDU:", hex.EncodeToString(MPDU),
+						"expected:", hex.EncodeToString(expectedMAC))
 					continue
 				}
 
 				dap := MSDU_NOMAC[1:]
 				if !ecdh.CheckPublic(dap) {
 					// drop
-					fmt.Println("received invalid public key:",
-						hex.EncodeToString(dap))
+					fmt.Println("received invalid public key:", hex.EncodeToString(dap))
 					continue
 				}
 				db, _ := ecdh.GeneratePrivate()
@@ -255,10 +239,7 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 						"created session keys:", hex.EncodeToString(SIK), hex.EncodeToString(SCK))
 				}
 
-				mac = hmac.New(sha256.New, authkey)
-				mac.Write(MPDU)
-				sha256_mac = mac.Sum(nil)
-				copy(msgMAC, sha256_mac[:8]) // truncate to first 8 Bytes
+				msgMAC = hmac.SHA256HMACGenerate(authkey, MPDU)
 
 				MFR := []byte{0xde, 0xad} // FCS, 16-bit CRC <--fake
 
@@ -286,15 +267,10 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 
 				MPDU := append(MHR, MSDU_NOMAC...)
 
-				mac := hmac.New(sha256.New, SIK)
-				mac.Write(MPDU)
-				sha256_mac := mac.Sum(nil)
-				expectedMAC := make([]byte, 8)
-				copy(expectedMAC, sha256_mac[:8]) // truncate to first 8 Bytes
-				if !hmac.Equal(msgMAC, expectedMAC) {
+				if expectedMAC, match := hmac.SHA256HMACVerify(SIK, MPDU, msgMAC); !match {
 					// MAC verification fails, drop
-					fmt.Printf("failed MAC verification, MPDU: %s, key: %s, expectedMAC: %s\n",
-						hex.EncodeToString(MPDU), hex.EncodeToString(SIK), hex.EncodeToString(expectedMAC))
+					fmt.Println("failed MAC verification, MPDU:", hex.EncodeToString(MPDU),
+						"expected:", hex.EncodeToString(expectedMAC))
 					continue
 				}
 
@@ -313,10 +289,7 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 				MPDU = append(MHR, append([]byte{0x08}, // mID SBK update response
 					byte(0x00))...) // status 0x00: OK
 
-				mac = hmac.New(sha256.New, SIK)
-				mac.Write(MPDU)
-				sha256_mac = mac.Sum(nil)
-				copy(msgMAC, sha256_mac[:8]) // truncate to first 8 Bytes
+				msgMAC = hmac.SHA256HMACGenerate(SIK, MPDU)
 
 				MFR := []byte{0xde, 0xad} // FCS, 16-bit CRC <--fake
 

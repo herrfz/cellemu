@@ -11,10 +11,10 @@ func MakeRequest(dstpan, dstaddr, srcpan, srcaddr, msdu []byte) []byte {
 	return append(MHR, append(msdu, []byte{0xde, 0xad}...)...) // fake MFR
 }
 
-func MakeWDCInd(psdu, trail []byte) []byte {
+func MakeWDCInd(mpdu, trail []byte) []byte {
 	// create WDC_MAC_DATA_IND command from MAC_DATA_IND frame
-	phr := []byte{byte(len(psdu))}
-	ind := append(phr, append(psdu, trail...)...)
+	phr := []byte{byte(len(mpdu))}
+	ind := append(phr, append(mpdu, trail...)...)
 	ind = append([]byte{byte(len(ind))}, append([]byte{0x19}, // WDC_MAC_DATA_IND
 		ind...)...)
 	return ind
