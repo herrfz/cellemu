@@ -30,12 +30,12 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 			for {
 				PSDU, more := <-serial_ul_chan
 				if !more {
-					fmt.Println("serial uplink listener stopped")
 					break
 				}
 				IND := MakeWDCInd(PSDU, trail)
 				ul_chan <- IND
 			}
+			fmt.Println("serial uplink listener stopped")
 		}()
 	}
 
@@ -137,25 +137,21 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 			fmt.Println("sent data confirmation",
 				hex.EncodeToString(msg.WDC_MAC_DATA_CON))
 
+			// if connected to sensor node via serial, forward immediately
+			if serial {
+				MPDU := MakeRequest(DSTPAN, DSTADDR, []byte{0xff, 0xff}, []byte{0xff, 0xff}, MSDU)
+				serial_dl_chan <- MPDU
+				continue
+			}
+
 			mID := MSDU[0]
 			switch mID {
 			// application data
 			case 0x09, 0x0A:
-				if serial {
-					MPDU := MakeRequest(DSTPAN, DSTADDR, []byte{0xff, 0xff}, []byte{0xff, 0xff}, MSDU)
-					serial_dl_chan <- MPDU
-					continue
-				}
+				fmt.Println("received application data:", hex.EncodeToString(MSDU))
 
-			// generate NIK
+			// generate NIK / unauth ecdh
 			case 0x01:
-				if serial {
-					MPDU := MakeRequest(DSTPAN, DSTADDR, []byte{0xff, 0xff}, []byte{0xff, 0xff}, MSDU)
-					serial_dl_chan <- MPDU
-					continue
-				}
-
-				// nik / unauth ecdh
 				dap := MSDU[1:]
 				if !ecdh.CheckPublic(dap) {
 					// drop
@@ -188,14 +184,8 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 				ul_chan <- IND
 				fmt.Println("sent WDC_MAC_DATA_IND:", hex.EncodeToString(IND))
 
-			// generate LTSS or generate session keys
+			// generate LTSS or generate session keys / auth ecdh
 			case 0x03, 0x05:
-				if serial {
-					MPDU := MakeRequest(DSTPAN, DSTADDR, []byte{0xff, 0xff}, []byte{0xff, 0xff}, MSDU)
-					serial_dl_chan <- MPDU
-					continue
-				}
-
 				authkey := make([]byte, 16)
 				if mID == 0x03 {
 					copy(authkey, NIK)
@@ -281,12 +271,6 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 
 			// update SBK
 			case 0x07:
-				if serial {
-					MPDU := MakeRequest(DSTPAN, DSTADDR, []byte{0xff, 0xff}, []byte{0xff, 0xff}, MSDU)
-					serial_dl_chan <- MPDU
-					continue
-				}
-
 				msgMAC := MSDU[MSDULEN-8:] // msgMAC := last 8 Bytes of MSDU
 				MSDU_NOMAC := make([]byte, MSDULEN-8)
 				copy(MSDU_NOMAC, MSDU[:MSDULEN-8])
