@@ -11,7 +11,7 @@ import (
 	msg "github.com/herrfz/gowdc/messages"
 )
 
-func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
+func DoEmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 	var MSDULEN int
 	var MSDU []byte
 

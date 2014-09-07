@@ -13,7 +13,7 @@ install_bb:
 	GOARM=7 GOARCH=arm GOOS=linux go install
 
 clean:
-	rm ../../../../bin/coordnode
+	go clean ; rm ../../../../bin/coordnode
 
 clean_bb:
-	rm ../../../../bin/linux_arm/coordnode
+	go clean ; rm ../../../../bin/linux_arm/coordnode
