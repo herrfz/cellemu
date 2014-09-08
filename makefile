@@ -4,16 +4,16 @@ local:
 	go build
 
 bb:
-	GOARM=7 GOARCH=arm GOOS=linux go build
+	CC=arm-none-linux-gnueabi-gcc GOARM=7 GOARCH=arm GOOS=linux CGO_ENABLED=1 go build -ldflags -L/opt/arm/lib -o arm_coordnode
 
 install:
 	go install
 
 install_bb:
-	GOARM=7 GOARCH=arm GOOS=linux go install
+	CC=arm-none-linux-gnueabi-gcc GOARM=7 GOARCH=arm GOOS=linux CGO_ENABLED=1 go install -o arm_coordnode
 
 clean:
 	rm ../../../../bin/coordnode
 
 clean_bb:
-	rm ../../../../bin/linux_arm/coordnode
+	rm ../../../../bin/linux_arm/arm_coordnode
