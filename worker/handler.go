@@ -2,39 +2,41 @@
 package worker
 
 import (
-	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"github.com/herrfz/coordnode/crypto/blockcipher"
 	"github.com/herrfz/coordnode/crypto/ecdh"
+	"github.com/herrfz/coordnode/crypto/hmac"
 	msg "github.com/herrfz/gowdc/messages"
-	"time"
 )
 
-func receive_with_timeout (channel chan []byte, timeout time.Duration) ([]byte, error) {
-	select {
-	case buf := <-channel:
-		return buf, nil
-	case <-time.After(timeout * time.Second):
-		return []byte{}, fmt.Errorf("timeout while receiving message")
-	}
-}
-
-func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
+func DoEmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 	var MSDULEN int
 	var MSDU []byte
 
 	var NIK, S, AK, SIK, SCK []byte
 	var DSTADDR []byte
 
-	var TIMEOUT time.Duration
-	TIMEOUT = 10
+	// trailing LQI, ED, RX status, RX slot; TODO, all zeros for now
+	// I have to add one 0x00 to remove server error!! why!!
+	var trail = []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 
 	serial_dl_chan := make(chan []byte)
 	serial_ul_chan := make(chan []byte)
 	if serial {
 		go DoSerial(serial_dl_chan, serial_ul_chan, device)
+		go func() { // serial uplink listener goroutine
+			for {
+				MPDU, more := <-serial_ul_chan
+				if !more {
+					break
+				}
+				IND := MakeWDCInd(MPDU, trail)
+				ul_chan <- IND
+			}
+			fmt.Println("serial uplink listener stopped")
+		}()
 	}
 
 	for {
@@ -46,7 +48,7 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 				close(serial_dl_chan)
 				<-serial_ul_chan
 			}
-			ul_chan <- []byte{0xff, 0xff}
+			close(ul_chan)
 			break // stop goroutine no more data
 		}
 
@@ -85,8 +87,7 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 			fmt.Println("WDC sync-ed")
 
 		case 0x11: // start TDMA
-			fmt.Println("received start TDMA:",
-				hex.EncodeToString(buf))
+			fmt.Println("received start TDMA:", hex.EncodeToString(buf))
 			msg.WDC_GET_TDMA_RES[2] = 0x01 // running
 			copy(msg.WDC_GET_TDMA_RES[3:], buf[2:])
 			msg.WDC_ACK[1] = 0x12 // START_TDMA_REQ_ACK
@@ -103,12 +104,10 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 		case 0x15: // TDMA status
 			fmt.Println("received TDMA status request")
 			ul_chan <- msg.WDC_GET_TDMA_RES
-			fmt.Println("sent TDMA status response:",
-				hex.EncodeToString(msg.WDC_GET_TDMA_RES))
+			fmt.Println("sent TDMA status response:", hex.EncodeToString(msg.WDC_GET_TDMA_RES))
 
 		case 0x17: // data request
-			fmt.Println("received data request",
-				hex.EncodeToString(buf))
+			fmt.Println("received data request", hex.EncodeToString(buf))
 			// parse WDC_MAC_DATA_REQ, cf. EADS MAC Table 29
 			HANDLE := buf[2]
 			TXOPTS := buf[3]
@@ -132,39 +131,23 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 			msg.WDC_MAC_DATA_CON[2] = HANDLE
 			msg.WDC_MAC_DATA_CON[3] = 0x00 // success
 			ul_chan <- msg.WDC_MAC_DATA_CON
-			fmt.Println("sent data confirmation",
-				hex.EncodeToString(msg.WDC_MAC_DATA_CON))
+			fmt.Println("sent data confirmation", hex.EncodeToString(msg.WDC_MAC_DATA_CON))
 
-			// trailing LQI, ED, RX status, RX slot; TODO, all zeros for now
-			// I have to add one 0x00 to remove server error!! why!!
-			trail := []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+			// if connected to sensor node via serial, forward immediately
+			if serial {
+				MPDU := MakeRequest(DSTPAN, DSTADDR, []byte{0xff, 0xff}, []byte{0xff, 0xff}, MSDU)
+				serial_dl_chan <- MPDU
+				continue
+			}
 
 			mID := MSDU[0]
 			switch mID {
 			// application data
 			case 0x09, 0x0A:
-				if serial {
-					MPDU := MakeRequest(DSTPAN, DSTADDR, []byte{0xff, 0xff}, []byte{0xff, 0xff}, MSDU)
-					serial_dl_chan <- MPDU
-					continue
-				}
+				fmt.Println("received application data:", hex.EncodeToString(MSDU))
 
-			// generate NIK
+			// generate NIK / unauth ecdh
 			case 0x01:
-				if serial {
-					MPDU := MakeRequest(DSTPAN, DSTADDR, []byte{0xff, 0xff}, []byte{0xff, 0xff}, MSDU)
-					serial_dl_chan <- MPDU
-					PSDU, err := receive_with_timeout(serial_ul_chan, TIMEOUT)
-					if err != nil {
-						fmt.Println("error reading from serial:", err.Error())
-						continue
-					}
-					IND := MakeWDCInd(PSDU, trail)
-					ul_chan <- IND
-					continue
-				}
-
-				// nik / unauth ecdh
 				dap := MSDU[1:]
 				if !ecdh.CheckPublic(dap) {
 					// drop
@@ -175,43 +158,24 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 				dbp := ecdh.GeneratePublic(db)
 				zz, _ := ecdh.GenerateSecret(db, dap)
 				fmt.Println("shared secret:", hex.EncodeToString(zz))
+
 				zz_h := sha256.Sum256(zz)
 				NIK = zz_h[:16] // NIK := first 128 bits / 16 Bytes of the hash of the secret
 				fmt.Println("For sensor address:", hex.EncodeToString(DSTADDR),
 					"generated NIK:", hex.EncodeToString(NIK))
 
-				// construct WDC_MAC_DATA_IND return message
-				MHR := []byte{0x01, 0x88, // FCF, (see Emeric's noserial.patch)
-					0x00,       // sequence number, must be set to zero
-					0xff, 0xff, // WDC PAN
-					0xff, 0xff} // WDC address
-				MHR = append(MHR, append(DSTPAN, DSTADDR...)...)
+				// the MPDU of the return message
+				MPDU := MakeRequest([]byte{0xff, 0xff}, []byte{0xff, 0xff}, DSTPAN, DSTADDR,
+					append([]byte{0x02}, // mID NIK response
+						dbp...))
 
-				MFR := []byte{0xde, 0xad} // FCS, 16-bit CRC <--fake
-
-				PSDU := append(MHR, append([]byte{0x02}, // mID NIK response
-					append(dbp, MFR...)...)...)
-
-				IND := MakeWDCInd(PSDU, trail)
+				IND := MakeWDCInd(MPDU, trail)
 
 				ul_chan <- IND
 				fmt.Println("sent WDC_MAC_DATA_IND:", hex.EncodeToString(IND))
 
-			// generate LTSS or generate session keys
+			// generate LTSS or generate session keys / auth ecdh
 			case 0x03, 0x05:
-				if serial {
-					MPDU := MakeRequest(DSTPAN, DSTADDR, []byte{0xff, 0xff}, []byte{0xff, 0xff}, MSDU)
-					serial_dl_chan <- MPDU
-					PSDU, err := receive_with_timeout(serial_ul_chan, TIMEOUT)
-					if err != nil {
-						fmt.Println("error reading from serial:", err.Error())
-						continue
-					}
-					IND := MakeWDCInd(PSDU, trail)
-					ul_chan <- IND
-					continue
-				}
-
 				authkey := make([]byte, 16)
 				if mID == 0x03 {
 					copy(authkey, NIK)
@@ -234,23 +198,17 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 
 				MPDU := append(MHR, MSDU_NOMAC...)
 
-				mac := hmac.New(sha256.New, authkey)
-				mac.Write(MPDU)
-				sha256_mac := mac.Sum(nil)
-				expectedMAC := make([]byte, 8)
-				copy(expectedMAC, sha256_mac[:8]) // truncate to first 8 Bytes
-				if !hmac.Equal(msgMAC, expectedMAC) {
+				if expectedMAC, match := hmac.SHA256HMACVerify(authkey, MPDU, msgMAC); !match {
 					// MAC verification fails, drop
-					fmt.Printf("failed MAC verification, MPDU: %s, key: %s, expectedMAC: %s\n",
-						hex.EncodeToString(MPDU), hex.EncodeToString(authkey), hex.EncodeToString(expectedMAC))
+					fmt.Println("failed MAC verification, MPDU:", hex.EncodeToString(MPDU),
+						"expected:", hex.EncodeToString(expectedMAC))
 					continue
 				}
 
 				dap := MSDU_NOMAC[1:]
 				if !ecdh.CheckPublic(dap) {
 					// drop
-					fmt.Println("received invalid public key:",
-						hex.EncodeToString(dap))
+					fmt.Println("received invalid public key:", hex.EncodeToString(dap))
 					continue
 				}
 				db, _ := ecdh.GeneratePrivate()
@@ -281,10 +239,7 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 						"created session keys:", hex.EncodeToString(SIK), hex.EncodeToString(SCK))
 				}
 
-				mac = hmac.New(sha256.New, authkey)
-				mac.Write(MPDU)
-				sha256_mac = mac.Sum(nil)
-				copy(msgMAC, sha256_mac[:8]) // truncate to first 8 Bytes
+				msgMAC = hmac.SHA256HMACGenerate(authkey, MPDU)
 
 				MFR := []byte{0xde, 0xad} // FCS, 16-bit CRC <--fake
 
@@ -297,19 +252,6 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 
 			// update SBK
 			case 0x07:
-				if serial {
-					MPDU := MakeRequest(DSTPAN, DSTADDR, []byte{0xff, 0xff}, []byte{0xff, 0xff}, MSDU)
-					serial_dl_chan <- MPDU
-					PSDU, err := receive_with_timeout(serial_ul_chan, TIMEOUT)
-					if err != nil {
-						fmt.Println("error reading from serial:", err.Error())
-						continue
-					}
-					IND := MakeWDCInd(PSDU, trail)
-					ul_chan <- IND
-					continue
-				}
-
 				msgMAC := MSDU[MSDULEN-8:] // msgMAC := last 8 Bytes of MSDU
 				MSDU_NOMAC := make([]byte, MSDULEN-8)
 				copy(MSDU_NOMAC, MSDU[:MSDULEN-8])
@@ -325,15 +267,10 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 
 				MPDU := append(MHR, MSDU_NOMAC...)
 
-				mac := hmac.New(sha256.New, SIK)
-				mac.Write(MPDU)
-				sha256_mac := mac.Sum(nil)
-				expectedMAC := make([]byte, 8)
-				copy(expectedMAC, sha256_mac[:8]) // truncate to first 8 Bytes
-				if !hmac.Equal(msgMAC, expectedMAC) {
+				if expectedMAC, match := hmac.SHA256HMACVerify(SIK, MPDU, msgMAC); !match {
 					// MAC verification fails, drop
-					fmt.Printf("failed MAC verification, MPDU: %s, key: %s, expectedMAC: %s\n",
-						hex.EncodeToString(MPDU), hex.EncodeToString(SIK), hex.EncodeToString(expectedMAC))
+					fmt.Println("failed MAC verification, MPDU:", hex.EncodeToString(MPDU),
+						"expected:", hex.EncodeToString(expectedMAC))
 					continue
 				}
 
@@ -352,10 +289,7 @@ func EmulCoordNode(dl_chan, ul_chan chan []byte, serial bool, device string) {
 				MPDU = append(MHR, append([]byte{0x08}, // mID SBK update response
 					byte(0x00))...) // status 0x00: OK
 
-				mac = hmac.New(sha256.New, SIK)
-				mac.Write(MPDU)
-				sha256_mac = mac.Sum(nil)
-				copy(msgMAC, sha256_mac[:8]) // truncate to first 8 Bytes
+				msgMAC = hmac.SHA256HMACGenerate(SIK, MPDU)
 
 				MFR := []byte{0xde, 0xad} // FCS, 16-bit CRC <--fake
 

@@ -53,7 +53,7 @@ func main() {
 	dl_chan := make(chan []byte)
 	ul_chan := make(chan []byte)
 
-	go work.EmulCoordNode(dl_chan, ul_chan, *serial, *device)
+	go work.DoEmulCoordNode(dl_chan, ul_chan, *serial, *device)
 
 	data_ch := utils.MakeChannel(Socket{d_dl_sock})
 	cmd_ch := utils.MakeChannel(Socket{c_sock})

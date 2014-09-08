@@ -13,7 +13,7 @@ install_bb:
 	CC=arm-none-linux-gnueabi-gcc GOARM=7 GOARCH=arm GOOS=linux CGO_ENABLED=1 go install -o arm_coordnode
 
 clean:
-	rm ../../../../bin/coordnode
+	go clean ; rm ../../../../bin/coordnode
 
 clean_bb:
-	rm ../../../../bin/linux_arm/arm_coordnode
+	go clean ; rm ../../../../bin/linux_arm/coordnode
