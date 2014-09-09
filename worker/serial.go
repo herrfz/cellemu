@@ -12,23 +12,46 @@ import (
 )
 
 type Message struct {
-	id   int
-	data []byte
+	mtype int
+	data  []byte
 }
 
 func (msg *Message) GenerateMessage() []byte {
-	csum := calc_checksum(msg.data)
-	msg.data = append(msg.data, csum)
-	// length is defined only on payload and checksum
-	// id and length itself are not counted
 	msglen := len(msg.data)
+	buflen := msglen + 3 // add 3 for mtype, len, and csum
 
-	buf := make([]byte, msglen+2) // add 2 for id and len
-	buf[0] = byte(msg.id)
-	buf[1] = byte(msglen)
-	copy(buf[2:], msg.data)
+	buf := make([]byte, buflen)
+	buf[0] = byte(msg.mtype)
+	buf[1] = byte(buflen)
+
+	if msglen > 0 {
+		copy(buf[2:buflen-1], msg.data)
+	}
+	buf[buflen-1] = calc_checksum(buf[:buflen-1])
 
 	return buf
+}
+
+func (msg *Message) ParseBuffer(buf []byte) error {
+	buflen := len(buf)
+	if buf[1] != byte(buflen) {
+		return fmt.Errorf("invalid length")
+	}
+
+	csum := buf[buflen-1]
+	expcsum := calc_checksum(buf[:buflen-1])
+	if csum != expcsum {
+		return fmt.Errorf("invalid checksum")
+	}
+
+	msg.mtype = int(buf[0])
+	if msg.mtype == 3 || msg.mtype == 4 {
+		msg.data = buf[2 : buflen-1]
+	} else { // hello and hello ack have no content
+		msg.data = []byte{}
+	}
+
+	return nil
 }
 
 type SerialReader struct {
@@ -46,11 +69,21 @@ func (s SerialReader) ReadDevice() ([]byte, error) {
 }
 
 func calc_checksum(data []byte) byte {
-	var csum byte
+	var csum = byte(0xff)
 	for i := range data {
-		csum ^= data[i]
+		csum -= data[i]
 	}
 	return csum
+}
+
+func receive_with_timeout(rxch <-chan []byte, timeout time.Duration) ([]byte, error) {
+	select {
+	case <-time.After(timeout * time.Second):
+		return nil, fmt.Errorf("serial read timeout")
+
+	case buf := <-rxch:
+		return buf, nil
+	}
 }
 
 // FOR LOOPBACK TESTING ONLY, simply exits when device not available
@@ -71,7 +104,7 @@ LOOP:
 			break LOOP
 
 		case <-time.After(5 * time.Second):
-			msg := Message{id: 1, data: []byte{0xde, 0xad, 0xbe, 0xef}}
+			msg := Message{mtype: 1, data: []byte{0xde, 0xad, 0xbe, 0xef}}
 			buf := msg.GenerateMessage()
 			s.Write(buf)
 			fmt.Println("written to serial:", hex.EncodeToString(buf))
@@ -90,11 +123,26 @@ func DoSerial(dl_chan, ul_chan chan []byte, device string) {
 	}
 	defer s.Close()
 
-	// if handshake, do it here, continue only when successful
-
 	serial := SerialReader{s}
 	rxch := utils.MakeChannel(serial)
 
+	// handshake
+	hello := Message{1, []byte{}}
+	msg_hello := hello.GenerateMessage()
+	s.Write(msg_hello)
+	buf, err := receive_with_timeout(rxch, 10)
+	if err != nil {
+		fmt.Println("error reading serial handshake:", err.Error())
+		os.Exit(1)
+	}
+	rcvd := Message{}
+	rcvd.ParseBuffer(buf)
+	if rcvd.mtype != 2 {
+		fmt.Println("invalid hello ack")
+		os.Exit(1)
+	}
+
+	// automatic serial sender just for testing
 	stopch := make(chan bool)
 	go test_write_serial(stopch, dl_chan, s)
 
@@ -115,7 +163,7 @@ LOOP:
 				break LOOP
 			}
 
-			msg := Message{id: 1, data: data}
+			msg := Message{mtype: 3, data: data}
 			buf := msg.GenerateMessage()
 			s.Write(buf)
 			fmt.Println("written to serial:", hex.EncodeToString(buf))
@@ -125,13 +173,22 @@ LOOP:
 				continue
 			}
 
-			switch buf[0] {
-			case 0x01:
-				//ul_chan <- buf
-				fmt.Println("read from serial:", hex.EncodeToString(buf[2:])) // 1st and 2nd bytes are header
+			rcvd := Message{}
+			err := rcvd.ParseBuffer(buf)
+			if err != nil {
+				fmt.Println("error parsing buffer:", err.Error())
+				continue
+			}
 
-			case 0x02:
-				// TODO: handle other message types
+			switch rcvd.mtype {
+			case 1, 2:
+				continue
+
+			case 3:
+				ul_chan <- rcvd.data
+
+			case 4:
+				fmt.Println("received debug message:", hex.EncodeToString(rcvd.data))
 
 			}
 		}
