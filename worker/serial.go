@@ -34,6 +34,10 @@ func (msg *Message) GenerateMessage() []byte {
 
 func (msg *Message) ParseBuffer(buf []byte) error {
 	buflen := len(buf)
+	if buflen == 0 {
+		return fmt.Errorf("received zero length message")
+	}
+
 	if buf[1] != byte(buflen) {
 		return fmt.Errorf("invalid length")
 	}
@@ -87,8 +91,8 @@ func receive_with_timeout(rxch <-chan []byte, timeout time.Duration) ([]byte, er
 }
 
 // FOR LOOPBACK TESTING ONLY, simply exits when device not available
-func test_write_serial(stopch chan bool, dl_chan chan []byte, s io.ReadWriteCloser) {
-	c := &serial.Config{Name: "/dev/ttys002", Baud: 9600}
+func test_write_serial(stopch chan bool) {
+	c := &serial.Config{Name: "/dev/pts/3", Baud: 9600}
 	s, err := serial.OpenPort(c)
 	if err != nil {
 		fmt.Println("error opening loopback test serial interface:", err.Error())
@@ -97,14 +101,46 @@ func test_write_serial(stopch chan bool, dl_chan chan []byte, s io.ReadWriteClos
 	}
 	defer s.Close()
 
+	serial := SerialReader{s}
+	rxch := utils.MakeChannel(serial)
+
 LOOP:
 	for {
 		select {
 		case <-stopch:
 			break LOOP
 
+		case buf := <-rxch:
+			if len(buf) == 0 {
+				continue
+			}
+
+			rcvd := Message{}
+			err := rcvd.ParseBuffer(buf)
+			if err != nil {
+				fmt.Println("error parsing buffer:", err.Error())
+				continue
+			}
+
+			switch rcvd.mtype {
+			case 1:
+				hello_ack := Message{2, []byte{}}
+				msg_hello_ack := hello_ack.GenerateMessage()
+				s.Write(msg_hello_ack)
+
+			case 2:
+				continue
+
+			case 3:
+				fmt.Println("received application message:", hex.EncodeToString(rcvd.data))
+
+			case 4:
+				fmt.Println("received debug message:", hex.EncodeToString(rcvd.data))
+
+			}
+
 		case <-time.After(5 * time.Second):
-			msg := Message{mtype: 1, data: []byte{0xde, 0xad, 0xbe, 0xef}}
+			msg := Message{mtype: 4, data: []byte{0xde, 0xad, 0xbe, 0xef}}
 			buf := msg.GenerateMessage()
 			s.Write(buf)
 			fmt.Println("written to serial:", hex.EncodeToString(buf))
@@ -115,7 +151,7 @@ LOOP:
 
 // main goroutine loop
 func DoSerial(dl_chan, ul_chan chan []byte, device string) {
-	c := &serial.Config{Name: device, Baud: 4800}
+	c := &serial.Config{Name: device, Baud: 9600}
 	s, err := serial.OpenPort(c)
 	if err != nil {
 		fmt.Println("error opening serial interface:", err.Error())
@@ -126,11 +162,17 @@ func DoSerial(dl_chan, ul_chan chan []byte, device string) {
 	serial := SerialReader{s}
 	rxch := utils.MakeChannel(serial)
 
+	// automatic serial sender just for testing
+	stopch := make(chan bool)
+	go test_write_serial(stopch)
+
 	// handshake
 	hello := Message{1, []byte{}}
 	msg_hello := hello.GenerateMessage()
 	s.Write(msg_hello)
+	fmt.Println("sent hello, waiting for ack...")
 	buf, err := receive_with_timeout(rxch, 10)
+	fmt.Println("received hello ack:", hex.EncodeToString(buf))
 	if err != nil {
 		fmt.Println("error reading serial handshake:", err.Error())
 		os.Exit(1)
@@ -141,10 +183,6 @@ func DoSerial(dl_chan, ul_chan chan []byte, device string) {
 		fmt.Println("invalid hello ack")
 		os.Exit(1)
 	}
-
-	// automatic serial sender just for testing
-	stopch := make(chan bool)
-	go test_write_serial(stopch, dl_chan, s)
 
 LOOP:
 	for {

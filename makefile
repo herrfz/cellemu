@@ -16,5 +16,13 @@ all: amd64 arm i386
 install:
 	go install
 
+check: test fmt
+
+test:
+	go test ./...
+
+fmt:
+	go fmt ./...
+
 clean:
 	go clean -i ; rm -f coordnode_*
