@@ -92,7 +92,7 @@ func receive_with_timeout(rxch <-chan []byte, timeout time.Duration) ([]byte, er
 
 // FOR LOOPBACK TESTING ONLY, simply exits when device not available
 func test_write_serial(stopch chan bool) {
-	c := &serial.Config{Name: "/dev/pts/3", Baud: 9600}
+	c := &serial.Config{Name: "/dev/pts/6", Baud: 9600}
 	s, err := serial.OpenPort(c)
 	if err != nil {
 		fmt.Println("error opening loopback test serial interface:", err.Error())
@@ -119,6 +119,9 @@ LOOP:
 			err := rcvd.ParseBuffer(buf)
 			if err != nil {
 				fmt.Println("error parsing buffer:", err.Error())
+				debug := Message{4, buf}
+				msg_debug := debug.GenerateMessage()
+				s.Write(msg_debug)
 				continue
 			}
 
@@ -139,11 +142,11 @@ LOOP:
 
 			}
 
-		case <-time.After(5 * time.Second):
+		case <-time.After(30 * time.Second):
 			msg := Message{mtype: 4, data: []byte{0xde, 0xad, 0xbe, 0xef}}
 			buf := msg.GenerateMessage()
 			s.Write(buf)
-			fmt.Println("written to serial:", hex.EncodeToString(buf))
+			fmt.Println("test: written to serial:", hex.EncodeToString(buf))
 		}
 	}
 	fmt.Println("test_write_serial stopped")
