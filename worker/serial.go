@@ -92,7 +92,7 @@ func receive_with_timeout(rxch <-chan []byte, timeout time.Duration) ([]byte, er
 
 // FOR LOOPBACK TESTING ONLY, simply exits when device not available
 func test_write_serial(stopch chan bool) {
-	c := &serial.Config{Name: "/dev/pts/6", Baud: 9600}
+	c := &serial.Config{Name: "/dev/pts/5", Baud: 9600}
 	s, err := serial.OpenPort(c)
 	if err != nil {
 		fmt.Println("error opening loopback test serial interface:", err.Error())
@@ -154,6 +154,10 @@ LOOP:
 
 // main goroutine loop
 func DoSerial(dl_chan, ul_chan chan []byte, device string) {
+	// trailing LQI, ED, RX status, RX slot; TODO, all zeros for now
+	// I have to add one 0x00 to remove server error!! why!!
+	var trail = []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+
 	c := &serial.Config{Name: device, Baud: 9600}
 	s, err := serial.OpenPort(c)
 	if err != nil {
@@ -190,7 +194,7 @@ func DoSerial(dl_chan, ul_chan chan []byte, device string) {
 LOOP:
 	for {
 		select {
-		case data, more := <-dl_chan:
+		case buf, more := <-dl_chan:
 			if !more {
 				fmt.Println("stopping serial worker...")
 				select {
@@ -204,10 +208,27 @@ LOOP:
 				break LOOP
 			}
 
-			msg := Message{mtype: 3, data: data}
-			buf := msg.GenerateMessage()
-			s.Write(buf)
-			fmt.Println("written to serial:", hex.EncodeToString(buf))
+			respmsg, is_request := process_message(buf)
+			if is_request {
+				ul_chan <- respmsg
+			}
+
+			if len(buf) != 0 && buf[1] == 0x17 {
+				wdc_req := WDC_REQ{}
+				wdc_req.ParseWDCReq(buf)
+				if wdc_req.MSDULEN != len(wdc_req.MSDU) {
+					fmt.Println("MSDU length mismatch, on frame:", wdc_req.MSDULEN, ", received:", len(wdc_req.MSDU))
+					continue
+				}
+
+				MSDU := make([]byte, len(wdc_req.MSDU))
+				copy(MSDU, wdc_req.MSDU) // if I don't do this the MSDU gets corrupted!?!?!?
+				MPDU := MakeMPDU(wdc_req.DSTPAN, wdc_req.DSTADDR, []byte{0xff, 0xff}, []byte{0xff, 0xff}, MSDU)
+				app := Message{mtype: 3, data: MPDU}
+				msg_app := app.GenerateMessage()
+				s.Write(msg_app)
+				fmt.Println("written to serial:", hex.EncodeToString(msg_app))
+			}
 
 		case buf := <-rxch:
 			if len(buf) == 0 {
@@ -226,7 +247,8 @@ LOOP:
 				continue
 
 			case 3:
-				ul_chan <- rcvd.data
+				ind := MakeWDCInd(rcvd.data, trail) // rcvd.data must be an MPDU
+				ul_chan <- ind
 
 			case 4:
 				fmt.Println("received debug message:", hex.EncodeToString(rcvd.data))
