@@ -208,11 +208,6 @@ LOOP:
 				break LOOP
 			}
 
-			respmsg := process_message(buf)
-			if respmsg != nil {
-				ul_chan <- respmsg
-			}
-
 			if len(buf) != 0 && buf[1] == 0x17 {
 				wdc_req := WDC_REQ{}
 				wdc_req.ParseWDCReq(buf)

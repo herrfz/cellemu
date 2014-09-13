@@ -65,20 +65,23 @@ func main() {
 LOOP:
 	for {
 		select {
-		case d1 := <-cmd_ch:
-			dl_chan <- []byte(d1)
-			dbuf := <-ul_chan
-			c_sock.Send(string(dbuf), 0)
-			fmt.Println("sent answer to TCP command")
+		case buf := <-cmd_ch:
+			respmsg := work.ProcessMessage([]byte(buf))
+			if respmsg != nil {
+				c_sock.Send(string(respmsg), 0)
+				fmt.Println("sent answer to TCP command")
+			}
 
-		case d2 := <-data_ch:
-			dl_chan <- []byte(d2)
-			dbuf := <-ul_chan
-			d_ul_sock.Send(string(dbuf), 0)
-			fmt.Println("sent answer to UDP mcast message")
+		case buf := <-data_ch:
+			respmsg := work.ProcessMessage([]byte(buf))
+			if respmsg != nil {
+				d_ul_sock.Send(string(respmsg), 0)
+				fmt.Println("sent answer to UDP mcast message")
+			}
+			dl_chan <- []byte(buf)
 
-		case d3 := <-ul_chan:
-			d_ul_sock.Send(string(d3), 0)
+		case buf := <-ul_chan:
+			d_ul_sock.Send(string(buf), 0)
 			fmt.Println("sent node uplink message")
 
 		case <-c:

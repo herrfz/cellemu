@@ -7,7 +7,7 @@ import (
 )
 
 // process server/wdc messages, return nil if no response shall be sent
-func process_message(buf []byte) []byte {
+func ProcessMessage(buf []byte) []byte {
 	if len(buf) == 0 {
 		dummy := make([]byte, 0)
 		return dummy

@@ -24,11 +24,6 @@ func DoEmulCoordNode(dl_chan, ul_chan chan []byte) {
 			break // stop goroutine no more data
 		}
 
-		respmsg := process_message(buf)
-		if respmsg != nil {
-			ul_chan <- respmsg
-		}
-
 		if len(buf) != 0 && buf[1] == 0x17 {
 			wdc_req := WDC_REQ{}
 			wdc_req.ParseWDCReq(buf)
