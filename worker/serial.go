@@ -208,8 +208,8 @@ LOOP:
 				break LOOP
 			}
 
-			respmsg, is_request := process_message(buf)
-			if is_request {
+			respmsg := process_message(buf)
+			if respmsg != nil {
 				ul_chan <- respmsg
 			}
 

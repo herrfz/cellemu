@@ -24,8 +24,8 @@ func DoEmulCoordNode(dl_chan, ul_chan chan []byte) {
 			break // stop goroutine no more data
 		}
 
-		respmsg, is_request := process_message(buf)
-		if is_request {
+		respmsg := process_message(buf)
+		if respmsg != nil {
 			ul_chan <- respmsg
 		}
 
