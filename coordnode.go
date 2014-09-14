@@ -54,9 +54,9 @@ func main() {
 	ul_chan := make(chan []byte)
 
 	if *serial {
-		go work.DoSerial(dl_chan, ul_chan, *device)
+		go work.DoSerialDataRequest(dl_chan, ul_chan, *device)
 	} else {
-		go work.DoEmulCoordNode(dl_chan, ul_chan)
+		go work.DoDataRequest(dl_chan, ul_chan)
 	}
 
 	data_ch := utils.MakeChannel(Socket{d_dl_sock})
@@ -78,7 +78,11 @@ LOOP:
 				d_ul_sock.Send(string(respmsg), 0)
 				fmt.Println("sent answer to UDP mcast message")
 			}
-			dl_chan <- []byte(buf)
+			// if buf is MAC_DATA_REQUEST, pass it to handler goroutine
+			// can either be local handler or serial forwarder
+			if len(buf) != 0 && buf[1] == 0x17 {
+				dl_chan <- []byte(buf)
+			}
 
 		case buf := <-ul_chan:
 			d_ul_sock.Send(string(buf), 0)

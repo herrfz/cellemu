@@ -153,7 +153,7 @@ LOOP:
 }
 
 // main goroutine loop
-func DoSerial(dl_chan, ul_chan chan []byte, device string) {
+func DoSerialDataRequest(dl_chan, ul_chan chan []byte, device string) {
 	// trailing LQI, ED, RX status, RX slot; TODO, all zeros for now
 	// I have to add one 0x00 to remove server error!! why!!
 	var trail = []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
@@ -208,22 +208,20 @@ LOOP:
 				break LOOP
 			}
 
-			if len(buf) != 0 && buf[1] == 0x17 {
-				wdc_req := WDC_REQ{}
-				wdc_req.ParseWDCReq(buf)
-				if wdc_req.MSDULEN != len(wdc_req.MSDU) {
-					fmt.Println("MSDU length mismatch, on frame:", wdc_req.MSDULEN, ", received:", len(wdc_req.MSDU))
-					continue
-				}
-
-				MSDU := make([]byte, len(wdc_req.MSDU))
-				copy(MSDU, wdc_req.MSDU) // if I don't do this the MSDU gets corrupted!?!?!?
-				MPDU := MakeMPDU(wdc_req.DSTPAN, wdc_req.DSTADDR, []byte{0xff, 0xff}, []byte{0xff, 0xff}, MSDU)
-				app := Message{mtype: 3, data: MPDU}
-				msg_app := app.GenerateMessage()
-				s.Write(msg_app)
-				fmt.Println("written to serial:", hex.EncodeToString(msg_app))
+			wdc_req := WDC_REQ{}
+			wdc_req.ParseWDCReq(buf)
+			if wdc_req.MSDULEN != len(wdc_req.MSDU) {
+				fmt.Println("MSDU length mismatch, on frame:", wdc_req.MSDULEN, ", received:", len(wdc_req.MSDU))
+				continue
 			}
+
+			MSDU := make([]byte, len(wdc_req.MSDU))
+			copy(MSDU, wdc_req.MSDU) // if I don't do this the MSDU gets corrupted!?!?!?
+			MPDU := MakeMPDU(wdc_req.DSTPAN, wdc_req.DSTADDR, []byte{0xff, 0xff}, []byte{0xff, 0xff}, MSDU)
+			app := Message{mtype: 3, data: MPDU}
+			msg_app := app.GenerateMessage()
+			s.Write(msg_app)
+			fmt.Println("written to serial:", hex.EncodeToString(msg_app))
 
 		case buf := <-rxch:
 			if len(buf) == 0 {
