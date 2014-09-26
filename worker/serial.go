@@ -71,11 +71,18 @@ func (s SerialReader) ReadDevice() ([]byte, error) {
 	if err == nil {
 		ret[i] = buf[0] // first byte is ID
 		i++
-		s.serial.Read(buf)
 
+		s.serial.Read(buf)
 		ret[i] = buf[0] // next byte is length
+		len_in_msg := int(buf[0])
 		i++
-		mlen := int(buf[0])
+
+		var mlen int
+		if len_in_msg < 128 { // never trust input
+			mlen = len_in_msg
+		} else {
+			mlen = 128 // limit mlen to avoid overflow
+		}
 
 		for j := i; j < mlen; j++ { // the rest is payload
 			s.serial.Read(buf)
@@ -144,10 +151,10 @@ LOOP:
 
 			switch rcvd.mtype {
 			case 1:
-				hello_ack := Message{2, []byte{}}				
-				msg_hello_ack := hello_ack.GenerateMessage()				
+				hello_ack := Message{2, []byte{}}
+				msg_hello_ack := hello_ack.GenerateMessage()
 				s.Write(msg_hello_ack)
-				
+
 				test := Message{4, []byte{0xde, 0xad, 0xca, 0xfe}}
 				msg_test := test.GenerateMessage()
 				s.Write(msg_test)
