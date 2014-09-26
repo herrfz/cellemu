@@ -63,10 +63,27 @@ type SerialReader struct {
 }
 
 func (s SerialReader) ReadDevice() ([]byte, error) {
-	buf := make([]byte, 128)
-	msglen, _ := s.serial.Read(buf)
-	if msglen > 0 {
-		return buf[:msglen], nil
+	buf := make([]byte, 1)
+	ret := make([]byte, 128)
+
+	i := 0
+	_, err := s.serial.Read(buf) // read one byte at a time
+	if err == nil {
+		ret[i] = buf[0] // first byte is ID
+		i++
+		s.serial.Read(buf)
+
+		ret[i] = buf[0] // next byte is length
+		i++
+		mlen := int(buf[0])
+
+		for j := i; j < mlen; j++ { // the rest is payload
+			s.serial.Read(buf)
+			ret[j] = buf[0]
+		}
+
+		return ret[:mlen], nil
+
 	} else {
 		return []byte{}, nil
 	}
@@ -92,7 +109,7 @@ func receive_with_timeout(rxch <-chan []byte, timeout time.Duration) ([]byte, er
 
 // FOR LOOPBACK TESTING ONLY, simply exits when device not available
 func test_write_serial(stopch chan bool) {
-	c := &serial.Config{Name: "/dev/pts/6", Baud: 9600}
+	c := &serial.Config{Name: "/dev/pts/4", Baud: 9600}
 	s, err := serial.OpenPort(c)
 	if err != nil {
 		fmt.Println("error opening loopback test serial interface:", err.Error())
@@ -102,7 +119,7 @@ func test_write_serial(stopch chan bool) {
 	defer s.Close()
 
 	serial := SerialReader{s}
-	rxch := utils.MakeChannel(serial)
+	testrxch := utils.MakeChannel(serial)
 
 LOOP:
 	for {
@@ -110,7 +127,7 @@ LOOP:
 		case <-stopch:
 			break LOOP
 
-		case buf := <-rxch:
+		case buf := <-testrxch:
 			if len(buf) == 0 {
 				continue
 			}
@@ -127,9 +144,13 @@ LOOP:
 
 			switch rcvd.mtype {
 			case 1:
-				hello_ack := Message{2, []byte{}}
-				msg_hello_ack := hello_ack.GenerateMessage()
+				hello_ack := Message{2, []byte{}}				
+				msg_hello_ack := hello_ack.GenerateMessage()				
 				s.Write(msg_hello_ack)
+				
+				test := Message{4, []byte{0xde, 0xad, 0xca, 0xfe}}
+				msg_test := test.GenerateMessage()
+				s.Write(msg_test)
 
 			case 2:
 				continue
@@ -177,7 +198,7 @@ func DoSerialDataRequest(dl_chan, ul_chan chan []byte, device string) {
 	hello := Message{1, []byte{}}
 	msg_hello := hello.GenerateMessage()
 	s.Write(msg_hello)
-	fmt.Println("sent hello, waiting for ack...")
+	fmt.Println("sent hello:", hex.EncodeToString(msg_hello), "waiting for ack...")
 	buf, err := receive_with_timeout(rxch, 10)
 	fmt.Println("received hello ack:", hex.EncodeToString(buf))
 	if err != nil {
@@ -231,7 +252,7 @@ LOOP:
 			rcvd := Message{}
 			err := rcvd.ParseBuffer(buf)
 			if err != nil {
-				fmt.Println("error parsing buffer:", err.Error())
+				fmt.Println("error parsing buffer:", err.Error(), hex.EncodeToString(buf))
 				continue
 			}
 
