@@ -3,11 +3,64 @@ package blockcipher
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"io"
 )
 
-// decrypt AES-CBC plaintext
+// encrypt AES-CBC
+// the composition of these functions doesn't feel right, to be refactored
+func aesEncryptCBC(key, plaintext, iv []byte) ([]byte, error) {
+	if len(plaintext)%aes.BlockSize != 0 {
+		return nil, fmt.Errorf("plaintext length is not a multiple of AES block")
+	}
+
+	c, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	ciphertext := make([]byte, aes.BlockSize+len(plaintext))
+
+	copy(ciphertext[:aes.BlockSize], iv)
+
+	cbc := cipher.NewCBCEncrypter(c, iv)
+	cbc.CryptBlocks(ciphertext[aes.BlockSize:], plaintext)
+
+	return ciphertext, nil
+}
+
+func AESEncryptCBC(key, plaintext []byte) ([]byte, error) {
+	iv := make([]byte, aes.BlockSize)
+	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
+		return nil, err
+	}
+
+	return aesEncryptCBC(key, plaintext, iv)
+}
+
+func aesEncryptCBCPKCS7(key, plaintext, iv []byte) ([]byte, error) {
+	padlen := aes.BlockSize - (len(plaintext) % aes.BlockSize)
+	padbyte := byte(padlen)
+
+	for i := 0; i < padlen; i++ {
+		plaintext = append(plaintext, padbyte)
+	}
+
+	return aesEncryptCBC(key, plaintext, iv)
+}
+
+func AESEncryptCBCPKCS7(key, plaintext []byte) ([]byte, error) {
+	iv := make([]byte, aes.BlockSize)
+	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
+		return nil, err
+	}
+
+	return aesEncryptCBCPKCS7(key, plaintext, iv)
+}
+
+// decrypt AES-CBC of a ciphertext
 func AESDecryptCBC(key, ciphertext []byte) ([]byte, error) {
 	c, err := aes.NewCipher(key)
 	if err != nil {
