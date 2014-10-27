@@ -3,18 +3,23 @@ package worker
 
 import (
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"github.com/herrfz/coordnode/crypto/blockcipher"
 	"github.com/herrfz/coordnode/crypto/ecdh"
 	"github.com/herrfz/coordnode/crypto/hmac"
+	"time"
 )
 
 func DoDataRequest(dl_chan, ul_chan chan []byte) {
 	var NIK, S, AK, SIK, SCK []byte
+	var UL_POLICY byte
+	var COUNTER_BYTE = make([]byte, 4)
+	var COUNTER uint32 = 0
 	// trailing LQI, ED, RX status, RX slot; TODO, all zeros for now
-	// I have to add one 0x00 to remove server error!! why!!
-	var trail = []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+	// I have to add one 0x00 to remove server error!! why!! <-- maybe already solved..
+	var trail = []byte{0x00, 0x00, 0x00, 0x00, 0x00}
 
 	for {
 		buf, more := <-dl_chan
@@ -37,6 +42,37 @@ func DoDataRequest(dl_chan, ul_chan chan []byte) {
 			// application data
 			case 0x09, 0x0A:
 				fmt.Println("received application data:", hex.EncodeToString(wdc_req.MSDU))
+
+				sensor_addr := append(wdc_req.DSTPAN, wdc_req.DSTADDR...)
+				wdc_addr := []byte{0xff, 0xff, // WDC PAN
+					0xff, 0xff} // WDC address
+
+				// test uplink
+				COUNTER++
+				binary.LittleEndian.PutUint32(COUNTER_BYTE, COUNTER)
+				MHR := []byte{0x01, 0x88, // FCF, (see Emeric's noserial.patch)
+					0x00} // sequence number, must be set to zero
+				MHR = append(MHR, append(wdc_addr, sensor_addr...)...)
+				MSDU_HEADER := append([]byte{0x09}, COUNTER_BYTE...)
+				MSDU_PAYLOAD := []byte{0xca, 0xfe}
+
+				var procMSDU []byte
+				if UL_POLICY == 0x01 {
+					procMSDU, _ = blockcipher.AESEncryptCBCPKCS7(SCK, MSDU_PAYLOAD)
+				} else {
+					procMSDU = MSDU_PAYLOAD
+				}
+
+				MPDU := append(MHR, append(MSDU_HEADER, procMSDU...)...)
+
+				msgMAC := hmac.SHA256HMACGenerate(SIK, MPDU)
+				MFR := []byte{0xde, 0xad} // FCS, 16-bit CRC <--fake
+				PSDU := append(MPDU, append(msgMAC, MFR...)...)
+				IND := MakeWDCInd(PSDU, trail)
+
+				time.Sleep(1 * time.Second)
+				ul_chan <- IND
+				fmt.Println("sent WDC_MAC_DATA_IND:", hex.EncodeToString(IND))
 
 			// generate NIK / unauth ecdh
 			case 0x01:
@@ -178,6 +214,7 @@ func DoDataRequest(dl_chan, ul_chan chan []byte) {
 				PSDU := append(MPDU, append(msgMAC, MFR...)...)
 				IND := MakeWDCInd(PSDU, trail)
 
+				time.Sleep(1 * time.Second)
 				ul_chan <- IND
 				fmt.Println("sent WDC_MAC_DATA_IND:", hex.EncodeToString(IND))
 
@@ -205,6 +242,8 @@ func DoDataRequest(dl_chan, ul_chan chan []byte) {
 
 				fmt.Println("For sensor address:", hex.EncodeToString(wdc_req.DSTADDR),
 					"got policy:", hex.EncodeToString(MSDU_NOMAC[1:]))
+				// DL_POLICY = MSDU_NOMAC[1]
+				UL_POLICY = MSDU_NOMAC[2]
 
 				// construct return MPDU
 				MHR = []byte{0x01, 0x88, // FCF, (see Emeric's noserial.patch)
@@ -217,6 +256,7 @@ func DoDataRequest(dl_chan, ul_chan chan []byte) {
 				PSDU := append(MPDU, append(msgMAC, MFR...)...)
 				IND := MakeWDCInd(PSDU, trail)
 
+				time.Sleep(1 * time.Second)
 				ul_chan <- IND
 				fmt.Println("sent WDC_MAC_DATA_IND:", hex.EncodeToString(IND))
 

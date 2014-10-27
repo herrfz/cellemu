@@ -2,6 +2,7 @@ package blockcipher
 
 import (
 	"bytes"
+	"crypto/aes"
 	"encoding/hex"
 	"testing"
 )
@@ -42,6 +43,30 @@ var pkcstests = []testpair{
 	{"898be9cc5004ed0fa6e117c9a3099d31", "9dea7621945988f96491083849b068df", "e232cd6ef50047801ee681ec30f61d53cfd6b0bca02fd03c1b234baa10ea82ac9dab8b960926433a19ce6dea08677e34", "0397f4f6820b1f9386f14403be5ac16e50213bd473b4874b9bcbf5f318ee686b1d"},
 	{"be0d465f8004d636d90e3f9f6a9063d2", "748869ca52f219b4764c9ae986fa821b", "790511b7776b98be3d0a4861b7f1c8bb", ""},
 	{"893123f2d57b6e2c39e2f10d3ff818d1", "64be1b06ea7453ed2df9a79319d5edc5", "7067c4cb6dfc69df949c2f39903c9310", "44afb9a64ac896c2"},
+}
+
+func TestaesEncryptCBC(t *testing.T) {
+	for _, pair := range tests {
+		key, _ := hex.DecodeString(pair.key)
+		iv, _ := hex.DecodeString(pair.iv)
+		ct, _ := hex.DecodeString(pair.ct)
+		pt, _ := hex.DecodeString(pair.pt)
+		if cipher, _ := aesEncryptCBC(key, pt, iv); !bytes.Equal(cipher[aes.BlockSize:], ct) {
+			t.Error("expected:", hex.EncodeToString(ct), "got:", hex.EncodeToString(cipher[aes.BlockSize:]))
+		}
+	}
+}
+
+func TestaesEncryptCBCPKCS7(t *testing.T) {
+	for _, pair := range pkcstests {
+		key, _ := hex.DecodeString(pair.key)
+		iv, _ := hex.DecodeString(pair.iv)
+		ct, _ := hex.DecodeString(pair.ct)
+		pt, _ := hex.DecodeString(pair.pt)
+		if cipher, _ := aesEncryptCBCPKCS7(key, pt, iv); !bytes.Equal(cipher[aes.BlockSize:], ct) {
+			t.Error("expected:", hex.EncodeToString(ct), "got:", hex.EncodeToString(cipher[aes.BlockSize:]))
+		}
+	}
 }
 
 func TestAESDecryptCBC(t *testing.T) {
