@@ -28,6 +28,7 @@ func (sock Socket) ReadDevice() ([]byte, error) {
 func main() {
 	serial := flag.Bool("serial", false, "use serial port to talk to sensor node")
 	device := flag.String("device", "", "serial device to use")
+	jamming := flag.Bool("jamming", false, "send jamming messages to server")
 	flag.Parse()
 
 	if *serial && *device == "" {
@@ -57,6 +58,10 @@ func main() {
 		go work.DoSerialDataRequest(dl_chan, ul_chan, *device)
 	} else {
 		go work.DoDataRequest(dl_chan, ul_chan)
+	}
+
+	if *jamming {
+		go work.DoSendJamming(dl_chan, ul_chan)
 	}
 
 	data_ch := utils.MakeChannel(Socket{d_dl_sock})
