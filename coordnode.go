@@ -56,18 +56,21 @@ LOOP:
 	for {
 		select {
 		case buf := <-wdcch:
-			respmsg := work.ProcessMessage(buf)
+			serial_req := buf[1:] // ditch the first byte (start of frame)
+			respmsg := work.ProcessMessage(serial_req)
 			if respmsg != nil {
-				s.Write(respmsg)
+				serial_res := append([]byte{0x34}, respmsg...)
+				s.Write(serial_res)
 				fmt.Println("sent answer to WDC request")
 			}
 			// if buf is MAC_DATA_REQUEST, pass it to handler goroutine
-			if len(buf) != 0 && buf[1] == 0x17 {
-				dl_chan <- buf
+			if len(serial_req) != 0 && serial_req[1] == 0x17 {
+				dl_chan <- serial_req
 			}
 
 		case buf := <-ul_chan:
-			s.Write(buf)
+			serial_res := append([]byte{0x34}, buf...) // add start of frame byte 0x34
+			s.Write(serial_res)
 			fmt.Println("sent node uplink message")
 
 		case <-c:
