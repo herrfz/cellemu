@@ -56,10 +56,9 @@ LOOP:
 	for {
 		select {
 		case buf := <-wdcch:
-			serial_req := buf[1:] // ditch the first byte (start of frame)
-			respmsg := work.ProcessMessage(serial_req)
-			if respmsg != nil {
-				serial_res := append([]byte{0x34}, respmsg...)
+			serial_req := buf
+			serial_res := work.ProcessMessage(serial_req)
+			if serial_res != nil {
 				s.Write(serial_res)
 				fmt.Println("sent answer to WDC request")
 			}
@@ -69,7 +68,7 @@ LOOP:
 			}
 
 		case buf := <-ul_chan:
-			serial_res := append([]byte{0x34}, buf...) // add start of frame byte 0x34
+			serial_res := buf
 			s.Write(serial_res)
 			fmt.Println("sent node uplink message")
 
