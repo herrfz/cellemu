@@ -49,7 +49,7 @@ func DoDataRequest(dl_chan, ul_chan chan []byte) {
 
 				// test uplink
 				COUNTER++
-				binary.LittleEndian.PutUint32(COUNTER_BYTE, COUNTER)
+				binary.BigEndian.PutUint32(COUNTER_BYTE, COUNTER)
 				MHR := []byte{0x01, 0x88, // FCF, (see Emeric's noserial.patch)
 					0x00} // sequence number, must be set to zero
 				MHR = append(MHR, append(wdc_addr, sensor_addr...)...)
