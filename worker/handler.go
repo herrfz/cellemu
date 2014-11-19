@@ -22,7 +22,10 @@ func DoDataRequest(dl_chan, ul_chan, app_dl_chan, app_ul_chan chan []byte) {
 
 	for {
 		select {
-		case payload := <-app_ul_chan:
+		case payload, more := <-app_ul_chan:
+			if !more {
+				continue
+			}
 			// uplink
 			COUNTER++
 			binary.BigEndian.PutUint32(COUNTER_BYTE, COUNTER)
