@@ -114,72 +114,6 @@ func receive_with_timeout(rxch <-chan []byte, timeout time.Duration) ([]byte, er
 	}
 }
 
-// FOR LOOPBACK TESTING ONLY, simply exits when device not available
-func test_write_serial(stopch chan bool) {
-	c := &serial.Config{Name: "/dev/pts/4", Baud: 9600}
-	s, err := serial.OpenPort(c)
-	if err != nil {
-		fmt.Println("error opening loopback test serial interface:", err.Error())
-		close(stopch)
-		return
-	}
-	defer s.Close()
-
-	serial := SerialReader{s}
-	testrxch := utils.MakeChannel(serial)
-
-LOOP:
-	for {
-		select {
-		case <-stopch:
-			break LOOP
-
-		case buf := <-testrxch:
-			if len(buf) == 0 {
-				continue
-			}
-
-			rcvd := Message{}
-			err := rcvd.ParseBuffer(buf)
-			if err != nil {
-				fmt.Println("error parsing buffer:", err.Error())
-				debug := Message{4, buf}
-				msg_debug := debug.GenerateMessage()
-				s.Write(msg_debug)
-				continue
-			}
-
-			switch rcvd.mtype {
-			case 1:
-				hello_ack := Message{2, []byte{}}
-				msg_hello_ack := hello_ack.GenerateMessage()
-				s.Write(msg_hello_ack)
-
-				test := Message{4, []byte{0xde, 0xad, 0xca, 0xfe}}
-				msg_test := test.GenerateMessage()
-				s.Write(msg_test)
-
-			case 2:
-				continue
-
-			case 3:
-				fmt.Println("received application message:", hex.EncodeToString(rcvd.data))
-
-			case 4:
-				fmt.Println("received debug message:", hex.EncodeToString(rcvd.data))
-
-			}
-
-		case <-time.After(30 * time.Second):
-			msg := Message{mtype: 4, data: []byte{0xde, 0xad, 0xbe, 0xef}}
-			buf := msg.GenerateMessage()
-			s.Write(buf)
-			fmt.Println("test: written to serial:", hex.EncodeToString(buf))
-		}
-	}
-	fmt.Println("test_write_serial stopped")
-}
-
 // main goroutine loop
 func DoSerialDataRequest(dl_chan, ul_chan chan []byte, device string) {
 	// trailing LQI, ED, RX status, RX slot; TODO, all zeros for now
@@ -196,10 +130,6 @@ func DoSerialDataRequest(dl_chan, ul_chan chan []byte, device string) {
 
 	serial := SerialReader{s}
 	rxch := utils.MakeChannel(serial)
-
-	// automatic serial sender just for testing
-	stopch := make(chan bool)
-	go test_write_serial(stopch)
 
 	// handshake
 	hello := Message{1, []byte{}}
@@ -225,13 +155,6 @@ LOOP:
 		case buf, more := <-dl_chan:
 			if !more {
 				fmt.Println("stopping serial worker...")
-				select {
-				case <-stopch: // stop channel is closed, no test writer is running
-					break
-				default:
-					stopch <- true
-				}
-
 				close(ul_chan)
 				break LOOP
 			}
