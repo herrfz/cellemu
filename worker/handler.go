@@ -116,12 +116,12 @@ func DoDataRequest(dl_chan, ul_chan chan []byte) {
 				copy(MSDU_NOMAC, wdc_req.MSDU[:wdc_req.MSDULEN-8]) // if I don't do this the MSDU gets corrupted!?!?!?
 
 				// construct MPDU for which the msgMAC is computed
-				MHR := []byte{0x01, 0x88, // FCF, (see Emeric's noserial.patch)
+				MHR := []byte{0x01, 0x08, // FCF, (see Emeric's noserial.patch)
 					0x00} // sequence number, must be set to zero
 				sensor_addr := append(wdc_req.DSTPAN, wdc_req.DSTADDR...)
 				wdc_addr := []byte{0xff, 0xff, // WDC PAN
 					0xff, 0xff} // WDC address
-				MHR = append(MHR, append(sensor_addr, wdc_addr...)...)
+				MHR = append(MHR, sensor_addr...)
 				MPDU := append(MHR, MSDU_NOMAC...)
 
 				if expectedMAC, match := hmac.SHA256HMACVerify(authkey, MPDU, msgMAC); !match {
@@ -180,12 +180,12 @@ func DoDataRequest(dl_chan, ul_chan chan []byte) {
 				copy(MSDU_NOMAC, wdc_req.MSDU[:wdc_req.MSDULEN-8]) // if I don't do this the MSDU gets corrupted!?!?!?
 
 				// construct MPDU for which the msgMAC is computed
-				MHR := []byte{0x01, 0x88, // FCF, (see Emeric's noserial.patch)
+				MHR := []byte{0x01, 0x08, // FCF, (see Emeric's noserial.patch)
 					0x00} // sequence number, must be set to zero
 				sensor_addr := append(wdc_req.DSTPAN, wdc_req.DSTADDR...)
 				wdc_addr := []byte{0xff, 0xff, // WDC PAN
 					0xff, 0xff} // WDC address
-				MHR = append(MHR, append(sensor_addr, wdc_addr...)...)
+				MHR = append(MHR, sensor_addr...)
 				MPDU := append(MHR, MSDU_NOMAC...)
 
 				if expectedMAC, match := hmac.SHA256HMACVerify(SIK, MPDU, msgMAC); !match {
@@ -225,12 +225,12 @@ func DoDataRequest(dl_chan, ul_chan chan []byte) {
 				copy(MSDU_NOMAC, wdc_req.MSDU[:wdc_req.MSDULEN-8]) // if I don't do this the MSDU gets corrupted!?!?!?
 
 				// construct MPDU for which the msgMAC is computed
-				MHR := []byte{0x01, 0x88, // FCF, (see Emeric's noserial.patch)
+				MHR := []byte{0x01, 0x08, // FCF, (see Emeric's noserial.patch)
 					0x00} // sequence number, must be set to zero
 				sensor_addr := append(wdc_req.DSTPAN, wdc_req.DSTADDR...)
 				wdc_addr := []byte{0xff, 0xff, // WDC PAN
 					0xff, 0xff} // WDC address
-				MHR = append(MHR, append(sensor_addr, wdc_addr...)...)
+				MHR = append(MHR, sensor_addr...)
 				MPDU := append(MHR, MSDU_NOMAC...)
 
 				if expectedMAC, match := hmac.SHA256HMACVerify(SIK, MPDU, msgMAC); !match {
