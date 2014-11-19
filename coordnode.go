@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/herrfz/coordnode/app"
 	work "github.com/herrfz/coordnode/worker"
 	"github.com/herrfz/gowdc/utils"
 	zmq "github.com/pebbe/zmq4"
@@ -53,15 +54,17 @@ func main() {
 
 	dl_chan := make(chan []byte)
 	ul_chan := make(chan []byte)
+	app_dl_chan := make(chan []byte)
+	app_ul_chan := make(chan []byte)
 
 	if *serial {
 		go work.DoSerialDataRequest(dl_chan, ul_chan, *device)
 	} else {
-		go work.DoDataRequest(dl_chan, ul_chan)
+		go work.DoDataRequest(dl_chan, ul_chan, app_dl_chan, app_ul_chan)
 	}
 
 	if *jamming {
-		go work.DoSendJamming(dl_chan, ul_chan)
+		go app.DoSendJamming(app_dl_chan, app_ul_chan, 2)
 	}
 
 	data_ch := utils.MakeChannel(Socket{d_dl_sock})
@@ -94,6 +97,8 @@ LOOP:
 			fmt.Println("sent node uplink message")
 
 		case <-c:
+			close(app_dl_chan)
+			<-app_ul_chan
 			close(dl_chan)
 			<-ul_chan
 			break LOOP
