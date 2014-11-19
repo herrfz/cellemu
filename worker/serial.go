@@ -259,7 +259,7 @@ LOOP:
 			rcvd := Message{}
 			err := rcvd.ParseBuffer(buf)
 			if err != nil {
-				fmt.Println("error parsing buffer:", err.Error(), string(buf[2:]))
+				fmt.Println("error parsing buffer:", err.Error(), hex.EncodeToString(buf))
 				continue
 			}
 
@@ -272,7 +272,7 @@ LOOP:
 				ul_chan <- ind
 
 			case 4:
-				fmt.Println("received debug message:", string(rcvd.data))
+				fmt.Println("received debug message:", hex.EncodeToString(rcvd.data))
 
 			}
 		}
