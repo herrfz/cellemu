@@ -3,10 +3,10 @@ package worker
 import "github.com/herrfz/coordnode/crypto/hmac"
 
 type WDC_REQ struct {
-	DSTPAN  []byte
-	DSTADDR []byte
+	DSTPAN,
+	DSTADDR,
+	MSDU []byte
 	MSDULEN int
-	MSDU    []byte
 }
 
 func (req *WDC_REQ) ParseWDCReq(buf []byte) {
@@ -26,14 +26,14 @@ func (req *WDC_REQ) ParseWDCReq(buf []byte) {
 }
 
 type DL_AUTH_FRAME struct {
-	MHR      []byte
-	SEQNR    []byte
-	DSTPAN   []byte
-	DSTADDR  []byte
-	MID      []byte
-	PAYLOAD  []byte
-	MAC      []byte
-	MFR      []byte
+	MHR,
+	SEQNR,
+	DSTPAN,
+	DSTADDR,
+	MID,
+	PAYLOAD,
+	MAC,
+	MFR,
 	AUTHDATA []byte
 }
 
@@ -57,9 +57,9 @@ func (frame *DL_AUTH_FRAME) MakeDownlinkFrame(req WDC_REQ) {
 }
 
 type UL_AUTH_FRAME struct {
-	MHR   []byte
-	SEQNR []byte
-	MFR   []byte
+	MHR,
+	SEQNR,
+	MFR,
 	FRAME []byte
 }
 
