@@ -9,6 +9,7 @@ import (
 	zmq "github.com/pebbe/zmq4"
 	"os"
 	"os/signal"
+	"strings"
 )
 
 type Socket struct {
@@ -26,16 +27,29 @@ func (sock Socket) ReadDevice() ([]byte, error) {
 	return []byte(buf), err
 }
 
+type AppFunction func(chan []byte, chan []byte)
+
 func main() {
 	serial := flag.Bool("serial", false, "use serial port to talk to sensor node")
 	device := flag.String("device", "", "serial device to use")
-	jamming := flag.Bool("jamming", false, "send jamming messages to server")
+	apps := flag.String("apps", "jamming", "list of applications")
 	flag.Parse()
 
 	if *serial && *device == "" {
 		fmt.Println("no serial device provided")
 		os.Exit(1)
 	}
+
+	listapps := strings.Split(*apps, ",")
+
+	dl_chan := make(chan []byte)
+	ul_chan := make(chan []byte)
+	app_dl_chan := make(chan []byte)
+	app_ul_chan := make(chan []byte)
+
+	// map string argument with the corresponding app function
+	mapapps := make(map[string]AppFunction)
+	mapapps["jamming"] = app.DoSendJamming
 
 	c := make(chan os.Signal)
 	signal.Notify(c, os.Interrupt)
@@ -44,18 +58,13 @@ func main() {
 	defer c_sock.Close()
 	c_sock.Bind("tcp://*:5555")
 
-	d_dl_sock, _ := zmq.NewSocket(zmq.PULL)
+	d_dl_sock, _ := zmq.NewSocket(zmq.PULL) // SUB
 	defer d_dl_sock.Close()
 	d_dl_sock.Connect("tcp://localhost:5556")
 
-	d_ul_sock, _ := zmq.NewSocket(zmq.PUSH)
+	d_ul_sock, _ := zmq.NewSocket(zmq.PUSH) // PUB
 	defer d_ul_sock.Close()
 	d_ul_sock.Bind("tcp://*:5557")
-
-	dl_chan := make(chan []byte)
-	ul_chan := make(chan []byte)
-	app_dl_chan := make(chan []byte)
-	app_ul_chan := make(chan []byte)
 
 	if *serial {
 		go work.DoSerialDataRequest(dl_chan, ul_chan, *device)
@@ -63,8 +72,12 @@ func main() {
 		go work.DoDataRequest(dl_chan, ul_chan, app_dl_chan, app_ul_chan)
 	}
 
-	if *jamming {
-		go app.DoSendJamming(app_dl_chan, app_ul_chan, 2)
+	// iterate over apps and start the corresponding goroutine
+	for _, a := range listapps {
+		fun := mapapps[a]
+		if fun != nil {
+			go fun(app_dl_chan, app_ul_chan)
+		}
 	}
 
 	data_ch := utils.MakeChannel(Socket{d_dl_sock})
@@ -98,7 +111,6 @@ LOOP:
 
 		case <-c:
 			close(app_dl_chan)
-			<-app_ul_chan
 			close(dl_chan)
 			<-ul_chan
 			break LOOP

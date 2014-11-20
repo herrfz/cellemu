@@ -20,11 +20,12 @@ func DoDataRequest(dl_chan, ul_chan, app_dl_chan, app_ul_chan chan []byte) {
 	// trailing LQI, ED, RX status, RX slot; TODO, all zeros for now
 	var trail = []byte{0x00, 0x00, 0x00, 0x00, 0x00}
 
+LOOP:
 	for {
 		select {
 		case payload, more := <-app_ul_chan:
 			if !more {
-				continue
+				continue // give a chance to close dl_chan
 			}
 			// uplink
 			COUNTER++
@@ -52,7 +53,7 @@ func DoDataRequest(dl_chan, ul_chan, app_dl_chan, app_ul_chan chan []byte) {
 			if !more {
 				fmt.Println("stopping CoordNode emulator...")
 				close(ul_chan)
-				break // stop goroutine no more data
+				break LOOP // stop goroutine no more data
 			}
 
 			wdc_req := WDC_REQ{}
@@ -139,6 +140,7 @@ func DoDataRequest(dl_chan, ul_chan, app_dl_chan, app_ul_chan chan []byte) {
 						ul_mid = []byte{0x04}
 						S = KEYS[:16]
 						AK = KEYS[16:]
+						COUNTER = 0
 						fmt.Println("For sensor address:", hex.EncodeToString(dl_frame.DSTADDR),
 							"created LTSS:", hex.EncodeToString(S), hex.EncodeToString(AK))
 					} else {
