@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"github.com/herrfz/coordnode/app"
@@ -32,7 +34,8 @@ type AppFunction func(chan []byte, chan []byte)
 func main() {
 	serial := flag.Bool("serial", false, "use serial port to talk to sensor node")
 	device := flag.String("device", "", "serial device to use")
-	apps := flag.String("apps", "jamming", "list of applications")
+	apps := flag.String("apps", "jamming", "list of applications, comma separated")
+	addr := flag.String("addr", "0000", "short address, two bytes little endian in hex")
 	flag.Parse()
 
 	if *serial && *device == "" {
@@ -41,6 +44,7 @@ func main() {
 	}
 
 	listapps := strings.Split(*apps, ",")
+	b_addr, _ := hex.DecodeString(*addr)
 
 	dl_chan := make(chan []byte)
 	ul_chan := make(chan []byte)
@@ -69,7 +73,7 @@ func main() {
 	if *serial {
 		go work.DoSerialDataRequest(dl_chan, ul_chan, *device)
 	} else {
-		go work.DoDataRequest(dl_chan, ul_chan, app_dl_chan, app_ul_chan)
+		go work.DoDataRequest(b_addr, dl_chan, ul_chan, app_dl_chan, app_ul_chan)
 	}
 
 	// iterate over apps and start the corresponding goroutine
@@ -102,7 +106,11 @@ LOOP:
 			// if buf is MAC_DATA_REQUEST, pass it to handler goroutine
 			// can either be local handler or serial forwarder
 			if len(buf) != 0 && buf[1] == 0x17 {
-				dl_chan <- []byte(buf)
+				reqmsg := work.WDC_REQ{}
+				reqmsg.ParseWDCReq([]byte(buf))
+				if bytes.Equal(reqmsg.DSTADDR, b_addr) { // only process message that is sent to us
+					dl_chan <- []byte(buf)
+				}
 			}
 
 		case buf := <-ul_chan:

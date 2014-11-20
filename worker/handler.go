@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-func DoDataRequest(dl_chan, ul_chan, app_dl_chan, app_ul_chan chan []byte) {
+func DoDataRequest(b_addr []byte, dl_chan, ul_chan, app_dl_chan, app_ul_chan chan []byte) {
 	var NIK, S, AK, SIK, SCK []byte
 	var UL_POLICY byte
 	var COUNTER_BYTE = make([]byte, 4)
@@ -44,8 +44,9 @@ LOOP:
 
 			ul_frame := UL_AUTH_FRAME{}
 			ul_frame.MakeUplinkFrame([]byte{0xff, 0xff}, []byte{0xff, 0xff}, // WDC
-				[]byte{0xb1, 0xca}, []byte{0x00, 0x00}, // sensor; TODO: configurable
-				[]byte{0x09}, // mID unicast
+				[]byte{0xb1, 0xca}, // sensor pan
+				b_addr,             // sensor addr
+				[]byte{0x09},       // mID unicast
 				append(COUNTER_BYTE, procMSDU...), SIK)
 			IND := MakeWDCInd(ul_frame.FRAME, trail)
 
