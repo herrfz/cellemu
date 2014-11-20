@@ -9,6 +9,7 @@ import (
 	"github.com/herrfz/coordnode/crypto/blockcipher"
 	"github.com/herrfz/coordnode/crypto/ecdh"
 	"github.com/herrfz/coordnode/crypto/hmac"
+	"sync"
 	"time"
 )
 
@@ -19,6 +20,9 @@ func DoDataRequest(dl_chan, ul_chan, app_dl_chan, app_ul_chan chan []byte) {
 	var COUNTER uint32 = 0
 	// trailing LQI, ED, RX status, RX slot; TODO, all zeros for now
 	var trail = []byte{0x00, 0x00, 0x00, 0x00, 0x00}
+
+	// protect access to uplink channel (apps and keymgmt goroutines)
+	var mutex = &sync.Mutex{}
 
 LOOP:
 	for {
@@ -45,8 +49,9 @@ LOOP:
 				append(COUNTER_BYTE, procMSDU...), SIK)
 			IND := MakeWDCInd(ul_frame.FRAME, trail)
 
-			time.Sleep(1 * time.Second)
+			mutex.Lock()
 			ul_chan <- IND
+			mutex.Unlock()
 			fmt.Println("sent WDC_MAC_DATA_IND:", hex.EncodeToString(IND))
 
 		case buf, more := <-dl_chan:
@@ -97,7 +102,9 @@ LOOP:
 
 					IND := MakeWDCInd(MPDU, trail)
 
+					mutex.Lock()
 					ul_chan <- IND
+					mutex.Unlock()
 					fmt.Println("sent WDC_MAC_DATA_IND:", hex.EncodeToString(IND))
 
 				// generate LTSS or generate session keys / auth ecdh
@@ -140,13 +147,13 @@ LOOP:
 						ul_mid = []byte{0x04}
 						S = KEYS[:16]
 						AK = KEYS[16:]
-						COUNTER = 0
 						fmt.Println("For sensor address:", hex.EncodeToString(dl_frame.DSTADDR),
 							"created LTSS:", hex.EncodeToString(S), hex.EncodeToString(AK))
 					} else {
 						ul_mid = []byte{0x06}
 						SIK = KEYS[:16]
 						SCK = KEYS[16:]
+						COUNTER = 0
 						fmt.Println("For sensor address:", hex.EncodeToString(dl_frame.DSTADDR),
 							"created session keys:", hex.EncodeToString(SIK), hex.EncodeToString(SCK))
 					}
@@ -154,7 +161,9 @@ LOOP:
 					ul_frame.MakeUplinkFrame([]byte{0xff, 0xff}, []byte{0xff, 0xff}, // WDC
 						dl_frame.DSTPAN, dl_frame.DSTADDR, ul_mid, dbp, authkey)
 					IND := MakeWDCInd(ul_frame.FRAME, trail)
+					mutex.Lock()
 					ul_chan <- IND
+					mutex.Unlock()
 					fmt.Println("sent WDC_MAC_DATA_IND:", hex.EncodeToString(IND))
 
 				// update SBK
@@ -186,7 +195,9 @@ LOOP:
 					IND := MakeWDCInd(ul_frame.FRAME, trail)
 
 					time.Sleep(1 * time.Second)
+					mutex.Lock()
 					ul_chan <- IND
+					mutex.Unlock()
 					fmt.Println("sent WDC_MAC_DATA_IND:", hex.EncodeToString(IND))
 
 				// update sensor nodes security policy
@@ -215,7 +226,9 @@ LOOP:
 					IND := MakeWDCInd(ul_frame.FRAME, trail)
 
 					time.Sleep(1 * time.Second)
+					mutex.Lock()
 					ul_chan <- IND
+					mutex.Unlock()
 					fmt.Println("sent WDC_MAC_DATA_IND:", hex.EncodeToString(IND))
 
 				default:

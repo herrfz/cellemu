@@ -45,8 +45,8 @@ func (frame *DL_AUTH_FRAME) MakeDownlinkFrame(req WDC_REQ) {
 	frame.DSTADDR = make([]byte, 2)
 	copy(frame.DSTADDR, req.DSTADDR)
 	frame.MID = []byte{req.MSDU[0]}
-	frame.PAYLOAD = make([]byte, req.MSDULEN-8)
-	copy(frame.PAYLOAD, req.MSDU[:req.MSDULEN-8])
+	frame.PAYLOAD = make([]byte, (req.MSDULEN-8)-1)
+	copy(frame.PAYLOAD, req.MSDU[1:req.MSDULEN-8])
 	frame.MAC = make([]byte, 8)
 	copy(frame.MAC, req.MSDU[req.MSDULEN-8:]) // MAC := last 8 Bytes of MSDU
 

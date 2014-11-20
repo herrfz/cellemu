@@ -14,7 +14,7 @@ func DoSendJamming(app_dl_chan, app_ul_chan chan []byte) {
 LOOP:
 	for {
 		select {
-		case <-time.Tick(2 * time.Second):
+		case <-time.Tick(5 * time.Second):
 			app_ul_chan <- payload
 			fmt.Println("sent data:", hex.EncodeToString(payload))
 
