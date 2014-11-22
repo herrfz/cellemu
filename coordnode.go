@@ -54,6 +54,7 @@ func main() {
 	// map string argument with the corresponding app function
 	mapapps := make(map[string]AppFunction)
 	mapapps["jamming"] = app.DoSendJamming
+	mapapps["temperature"] = app.DoSendTemperature
 
 	c := make(chan os.Signal)
 	signal.Notify(c, os.Interrupt)
