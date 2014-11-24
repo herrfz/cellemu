@@ -34,7 +34,7 @@ type AppFunction func(chan []byte, chan []byte)
 func main() {
 	serial := flag.Bool("serial", false, "use serial port to talk to sensor node")
 	device := flag.String("device", "", "serial device to use")
-	apps := flag.String("apps", "jamming", "list of applications, comma separated")
+	apps := flag.String("apps", "", "list of applications, comma separated")
 	addr := flag.String("addr", "0000", "short address, two bytes little endian in hex")
 	flag.Parse()
 
@@ -63,13 +63,13 @@ func main() {
 	defer c_sock.Close()
 	c_sock.Bind("tcp://*:5555")
 
-	d_dl_sock, _ := zmq.NewSocket(zmq.PULL) // SUB
+	d_dl_sock, _ := zmq.NewSocket(zmq.SUB) // SUB
 	defer d_dl_sock.Close()
-	d_dl_sock.Connect("tcp://localhost:5556")
+	d_dl_sock.Connect("tcp://127.0.0.1:5556")
 
 	d_ul_sock, _ := zmq.NewSocket(zmq.PUSH) // PUB
 	defer d_ul_sock.Close()
-	d_ul_sock.Bind("tcp://*:5557")
+	d_ul_sock.Connect("tcp://127.0.0.1:5557")
 
 	if *serial {
 		go work.DoSerialDataRequest(dl_chan, ul_chan, *device)
@@ -99,6 +99,7 @@ LOOP:
 			}
 
 		case buf := <-data_ch:
+			fmt.Println("received from downlink channel")
 			respmsg := work.ProcessMessage([]byte(buf))
 			if respmsg != nil {
 				d_ul_sock.Send(string(respmsg), 0)
