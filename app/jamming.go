@@ -18,7 +18,7 @@ LOOP:
 			payload := append(base_payload, ED)
 			ED += 1
 			app_ul_chan <- payload
-			fmt.Println("sent data:", hex.EncodeToString(payload))
+			fmt.Println("sent jamming data:", hex.EncodeToString(payload))
 
 		case _, more := <-app_dl_chan:
 			if !more {

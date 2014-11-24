@@ -31,6 +31,8 @@ func (sock Socket) ReadDevice() ([]byte, error) {
 
 type AppFunction func(chan []byte, chan []byte)
 
+const QSIZE = 10
+
 func main() {
 	serial := flag.Bool("serial", false, "use serial port to talk to sensor node")
 	device := flag.String("device", "", "serial device to use")
@@ -48,8 +50,8 @@ func main() {
 
 	dl_chan := make(chan []byte)
 	ul_chan := make(chan []byte)
-	app_dl_chan := make(chan []byte)
-	app_ul_chan := make(chan []byte)
+	app_dl_chan := make(chan []byte)        // no buffered channel, used only for broadcast close
+	app_ul_chan := make(chan []byte, QSIZE) // use buffered channel for multiple apps
 
 	// map string argument with the corresponding app function
 	mapapps := make(map[string]AppFunction)
@@ -66,6 +68,7 @@ func main() {
 	d_dl_sock, _ := zmq.NewSocket(zmq.SUB) // SUB
 	defer d_dl_sock.Close()
 	d_dl_sock.Connect("tcp://127.0.0.1:5556")
+	d_dl_sock.SetSubscribe("") // subscribe to all (?) TODO: subscribe to addr
 
 	d_ul_sock, _ := zmq.NewSocket(zmq.PUSH) // PUB
 	defer d_ul_sock.Close()
