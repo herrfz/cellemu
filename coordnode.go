@@ -38,6 +38,7 @@ func main() {
 	device := flag.String("device", "", "serial device to use")
 	apps := flag.String("apps", "", "list of applications, comma separated")
 	addr := flag.String("addr", "0000", "short address, two bytes little endian in hex")
+	master := flag.Bool("master", false, "set as master node that replies to handshake messages")
 	flag.Parse()
 
 	if *serial && *device == "" {
@@ -96,7 +97,7 @@ LOOP:
 		select {
 		case buf := <-cmd_ch:
 			respmsg := work.ProcessMessage([]byte(buf))
-			if respmsg != nil {
+			if respmsg != nil && *master {
 				c_sock.Send(string(respmsg), 0)
 				fmt.Println("sent answer to TCP command")
 			}
@@ -104,7 +105,7 @@ LOOP:
 		case buf := <-data_ch:
 			fmt.Println("received from downlink channel")
 			respmsg := work.ProcessMessage([]byte(buf))
-			if respmsg != nil {
+			if respmsg != nil && *master {
 				d_ul_sock.Send(string(respmsg), 0)
 				fmt.Println("sent answer to UDP mcast message")
 			}

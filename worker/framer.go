@@ -38,6 +38,10 @@ type DL_AUTH_FRAME struct {
 }
 
 func (frame *DL_AUTH_FRAME) MakeDownlinkFrame(req WDC_REQ) {
+	if req.MSDULEN < 8 { // must be longer than the MAC
+		return
+	}
+
 	frame.MHR = []byte{0x01, 0x08} // FCF, (see Emeric's noserial.patch)
 	frame.SEQNR = []byte{0x00}     // sequence number, must be set to zero
 	frame.DSTPAN = make([]byte, 2)
