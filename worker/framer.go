@@ -38,7 +38,7 @@ type DL_AUTH_FRAME struct {
 }
 
 func (frame *DL_AUTH_FRAME) MakeDownlinkFrame(req WDC_REQ) {
-	if req.MSDULEN < 8 { // must be longer than the MAC
+	if len(req.MSDU) < 8 { // must be longer than the MAC
 		return
 	}
 
