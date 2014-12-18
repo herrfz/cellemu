@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-func DoDataRequest(b_addr []byte, dl_chan, ul_chan, app_dl_chan, app_ul_chan chan []byte) {
+func DoDataRequest(b_addr []byte, dl_chan, ul_chan, app_dl_chan, app_ul_chan chan []byte, secure bool) {
 	var NIK, S, AK, SIK, SCK []byte
 	var UL_POLICY byte
 	var COUNTER_BYTE = make([]byte, 4)
@@ -31,23 +31,34 @@ LOOP:
 			if !more {
 				continue // give a chance to close dl_chan
 			}
-			// uplink
-			COUNTER++
-			binary.BigEndian.PutUint32(COUNTER_BYTE, COUNTER)
 
-			var procMSDU []byte
-			if UL_POLICY == 0x01 {
-				procMSDU, _ = blockcipher.AESEncryptCBCPKCS7(SCK, payload)
+			// uplink
+			ul_frame := UL_FRAME{auth: secure}
+			if secure {
+				COUNTER++
+				binary.BigEndian.PutUint32(COUNTER_BYTE, COUNTER)
+
+				var procMSDU []byte
+				if UL_POLICY == 0x01 {
+					procMSDU, _ = blockcipher.AESEncryptCBCPKCS7(SCK, payload)
+				} else {
+					procMSDU = payload
+				}
+
+				ul_frame.MakeUplinkFrame([]byte{0xff, 0xff}, []byte{0xff, 0xff}, // WDC
+					[]byte{0xb1, 0xca}, // sensor pan
+					b_addr,             // sensor addr
+					[]byte{0x09},       // mID unicast
+					append(COUNTER_BYTE, procMSDU...), SIK)
+
 			} else {
-				procMSDU = payload
+				ul_frame.MakeUplinkFrame([]byte{0xff, 0xff}, []byte{0xff, 0xff}, // WDC
+					[]byte{0xb1, 0xca}, // sensor pan
+					b_addr,             // sensor addr
+					[]byte{0x09},       // mID unicast
+					payload, SIK)       // SIK is not actually used here
 			}
 
-			ul_frame := UL_AUTH_FRAME{}
-			ul_frame.MakeUplinkFrame([]byte{0xff, 0xff}, []byte{0xff, 0xff}, // WDC
-				[]byte{0xb1, 0xca}, // sensor pan
-				b_addr,             // sensor addr
-				[]byte{0x09},       // mID unicast
-				append(COUNTER_BYTE, procMSDU...), SIK)
 			IND := MakeWDCInd(ul_frame.FRAME, trail)
 
 			mutex.Lock()
@@ -141,7 +152,7 @@ LOOP:
 					KEYS := sha256.Sum256(zz)
 
 					// construct return MPDU
-					ul_frame := UL_AUTH_FRAME{}
+					ul_frame := UL_FRAME{auth: true}
 					ul_mid := []byte{}
 
 					if mID == 0x03 {
@@ -188,7 +199,7 @@ LOOP:
 						"got SBK:", hex.EncodeToString(sbk))
 
 					// construct return MPDU
-					ul_frame := UL_AUTH_FRAME{}
+					ul_frame := UL_FRAME{auth: true}
 					ul_frame.MakeUplinkFrame([]byte{0xff, 0xff}, []byte{0xff, 0xff}, // WDC
 						dl_frame.DSTPAN, dl_frame.DSTADDR, []byte{0x08}, // mID SBK update response
 						[]byte{0x00}, // status OK
@@ -219,7 +230,7 @@ LOOP:
 					UL_POLICY = dl_frame.PAYLOAD[1]
 
 					// construct return MPDU
-					ul_frame := UL_AUTH_FRAME{}
+					ul_frame := UL_FRAME{auth: true}
 					ul_frame.MakeUplinkFrame([]byte{0xff, 0xff}, []byte{0xff, 0xff}, // WDC
 						dl_frame.DSTPAN, dl_frame.DSTADDR, []byte{0x0C}, // mID policy update response
 						[]byte{0x00}, // status OK

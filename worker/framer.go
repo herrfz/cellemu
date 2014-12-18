@@ -26,7 +26,7 @@ func (req *WDC_REQ) ParseWDCReq(buf []byte) {
 }
 
 type DL_AUTH_FRAME struct {
-	MHR,
+	FCF,
 	SEQNR,
 	DSTPAN,
 	DSTADDR,
@@ -42,7 +42,7 @@ func (frame *DL_AUTH_FRAME) MakeDownlinkFrame(req WDC_REQ) {
 		return
 	}
 
-	frame.MHR = []byte{0x01, 0x08} // FCF, (see Emeric's noserial.patch)
+	frame.FCF = []byte{0x01, 0x08} // FCF, (see Emeric's noserial.patch)
 	frame.SEQNR = []byte{0x00}     // sequence number, must be set to zero
 	frame.DSTPAN = make([]byte, 2)
 	copy(frame.DSTPAN, req.DSTPAN)
@@ -54,32 +54,45 @@ func (frame *DL_AUTH_FRAME) MakeDownlinkFrame(req WDC_REQ) {
 	frame.MAC = make([]byte, 8)
 	copy(frame.MAC, req.MSDU[req.MSDULEN-8:]) // MAC := last 8 Bytes of MSDU
 
-	authelms := [][]byte{frame.MHR, frame.SEQNR, frame.DSTPAN, frame.DSTADDR, frame.MID, frame.PAYLOAD}
+	authelms := [][]byte{frame.FCF, frame.SEQNR, frame.DSTPAN, frame.DSTADDR, frame.MID, frame.PAYLOAD}
 	for i := 0; i < len(authelms); i++ {
 		frame.AUTHDATA = append(frame.AUTHDATA, authelms[i]...)
 	}
 }
 
-type UL_AUTH_FRAME struct {
-	MHR,
+type UL_FRAME struct {
+	FCF,
 	SEQNR,
 	MFR,
 	FRAME []byte
+	auth bool
 }
 
-func (frame *UL_AUTH_FRAME) MakeUplinkFrame(dstpan, dstaddr, srcpan, srcaddr, mid, payload, authkey []byte) {
+func (frame *UL_FRAME) MakeUplinkFrame(dstpan, dstaddr, srcpan, srcaddr, mid, payload, authkey []byte) {
 	var authdata []byte
-	frame.MHR = []byte{0x01, 0x88} // FCF, (see Emeric's noserial.patch)
+	var authelms [][]byte
+
+	frame.FCF = []byte{0x01, 0x88} // FCF, (see Emeric's noserial.patch)
 	frame.SEQNR = []byte{0x00}     // sequence number, must be set to zero
 	frame.MFR = []byte{0xde, 0xad} // fake MFR
 
-	authelms := [][]byte{frame.MHR, frame.SEQNR, dstpan, dstaddr, srcpan, srcaddr, mid, payload}
+	if frame.auth {
+		authelms = [][]byte{frame.FCF, frame.SEQNR, dstpan, dstaddr, srcpan, srcaddr, mid, payload}
+	} else {
+		authelms = [][]byte{frame.FCF, frame.SEQNR, dstpan, dstaddr, srcpan, srcaddr, payload}
+	}
+
 	for i := 0; i < len(authelms); i++ {
 		authdata = append(authdata, authelms[i]...)
 	}
 
-	mac := hmac.SHA256HMACGenerate(authkey, authdata)
-	frame.FRAME = append(authdata, append(mac, frame.MFR...)...)
+	if frame.auth {
+		mac := hmac.SHA256HMACGenerate(authkey, authdata)
+		frame.FRAME = append(authdata, append(mac, frame.MFR...)...)
+	} else {
+		frame.FRAME = append(authdata, frame.MFR...)
+	}
+
 }
 
 func MakeMPDU(dstpan, dstaddr, srcpan, srcaddr, msdu []byte) []byte {

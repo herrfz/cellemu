@@ -39,6 +39,7 @@ func main() {
 	apps := flag.String("apps", "", "list of applications, comma separated")
 	addr := flag.String("addr", "0000", "short address, two bytes little endian in hex")
 	master := flag.Bool("master", false, "set as master node that replies to handshake messages")
+	secure := flag.Bool("sec", true, "use security features")
 	flag.Parse()
 
 	if *serial && *device == "" {
@@ -78,7 +79,7 @@ func main() {
 	if *serial {
 		go work.DoSerialDataRequest(dl_chan, ul_chan, *device)
 	} else {
-		go work.DoDataRequest(b_addr, dl_chan, ul_chan, app_dl_chan, app_ul_chan)
+		go work.DoDataRequest(b_addr, dl_chan, ul_chan, app_dl_chan, app_ul_chan, *secure)
 	}
 
 	// iterate over apps and start the corresponding goroutine
