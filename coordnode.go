@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"github.com/herrfz/coordnode/app"
 	work "github.com/herrfz/coordnode/worker"
-	"github.com/herrfz/gowdc/utils"
+	"github.com/herrfz/devreader"
 	zmq "github.com/pebbe/zmq4"
 	"os"
 	"os/signal"
@@ -90,8 +90,8 @@ func main() {
 		}
 	}
 
-	data_ch := utils.MakeChannel(Socket{d_dl_sock})
-	cmd_ch := utils.MakeChannel(Socket{c_sock})
+	data_ch := devreader.MakeChannel(Socket{d_dl_sock})
+	cmd_ch := devreader.MakeChannel(Socket{c_sock})
 
 LOOP:
 	for {
