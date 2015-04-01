@@ -4,7 +4,7 @@ package worker
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/herrfz/gowdc/utils"
+	"github.com/herrfz/devreader"
 	"github.com/tarm/goserial"
 	"io"
 	"os"
@@ -129,7 +129,7 @@ func DoSerialDataRequest(dl_chan, ul_chan chan []byte, device string) {
 	defer s.Close()
 
 	serial := SerialReader{s}
-	rxch := utils.MakeChannel(serial)
+	rxch := devreader.MakeChannel(serial)
 
 	// handshake
 	hello := Message{1, []byte{}}
