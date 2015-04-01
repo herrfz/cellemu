@@ -4,7 +4,7 @@ package worker
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/herrfz/gowdc/utils"
+	"github.com/herrfz/devreader"
 	"github.com/tarm/goserial"
 	"io"
 	"os"
@@ -126,7 +126,7 @@ func test_write_serial(stopch chan bool) {
 	defer s.Close()
 
 	serial := SerialReader{s}
-	testrxch := utils.MakeChannel(serial)
+	testrxch := devreader.MakeChannel(serial)
 
 LOOP:
 	for {
@@ -195,7 +195,7 @@ func DoSerialDataRequest(dl_chan, ul_chan chan []byte, device string) {
 	defer s.Close()
 
 	serial := SerialReader{s}
-	rxch := utils.MakeChannel(serial)
+	rxch := devreader.MakeChannel(serial)
 
 	// automatic serial sender just for testing
 	stopch := make(chan bool)

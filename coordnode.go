@@ -4,7 +4,7 @@ import (
 	"flag"
 	"fmt"
 	work "github.com/herrfz/coordnode/worker"
-	"github.com/herrfz/gowdc/utils"
+	"github.com/herrfz/devreader"
 	"github.com/tarm/goserial"
 	"io"
 	"os"
@@ -46,7 +46,7 @@ func main() {
 	defer s.Close()
 
 	serial := SerialReader{s}
-	wdcch := utils.MakeChannel(serial)
+	wdcch := devreader.MakeChannel(serial)
 
 	dl_chan := make(chan []byte)
 	ul_chan := make(chan []byte)
