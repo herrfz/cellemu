@@ -38,6 +38,7 @@ func main() {
 	device := flag.String("device", "", "serial device to use")
 	apps := flag.String("apps", "", "list of applications, comma separated")
 	addr := flag.String("addr", "0000", "short address, two bytes little endian in hex")
+	wdcaddr := flag.String("wdcaddr", "127.0.0.1", "WDC IP address for ZeroMQ socket")
 	master := flag.Bool("master", false, "set as master node that replies to handshake messages")
 	secure := flag.Bool("sec", true, "use security features")
 	flag.Parse()
@@ -69,12 +70,14 @@ func main() {
 
 	d_dl_sock, _ := zmq.NewSocket(zmq.SUB) // SUB
 	defer d_dl_sock.Close()
-	d_dl_sock.Connect("tcp://127.0.0.1:5556")
+	wdcsock := []string{"tcp://", *wdcaddr, ":5556"}
+	d_dl_sock.Connect(strings.Join(wdcsock, ""))
 	d_dl_sock.SetSubscribe("") // subscribe to all (?) TODO: subscribe to addr
 
 	d_ul_sock, _ := zmq.NewSocket(zmq.PUSH) // PUB
 	defer d_ul_sock.Close()
-	d_ul_sock.Connect("tcp://127.0.0.1:5557")
+	wdcsock = []string{"tcp://", *wdcaddr, ":5557"}
+	d_ul_sock.Connect(strings.Join(wdcsock, ""))
 
 	if *serial {
 		go work.DoSerialDataRequest(dl_chan, ul_chan, *device)
