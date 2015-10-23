@@ -115,6 +115,7 @@ func receive_with_timeout(rxch <-chan []byte, timeout time.Duration) ([]byte, er
 }
 
 // FOR LOOPBACK TESTING ONLY, simply exits when device not available
+// TODO: hard code path
 func test_write_serial(stopch chan bool) {
 	c := &serial.Config{Name: "/dev/pts/4", Baud: 9600}
 	s, err := serial.OpenPort(c)
@@ -225,13 +226,6 @@ LOOP:
 		case buf, more := <-dl_chan:
 			if !more {
 				fmt.Println("stopping serial worker...")
-				select {
-				case <-stopch: // stop channel is closed, no test writer is running
-					break
-				default:
-					stopch <- true
-				}
-
 				close(ul_chan)
 				break LOOP
 			}

@@ -17,7 +17,7 @@ var (
 	BitSize  = 256
 	ByteSize = BitSize / 8
 
-	curve = ec.CurveParams{P, N, B, Gx, Gy, BitSize}
+	curve = ec.CurveParams{P, N, B, Gx, Gy, BitSize, "P-256"}
 )
 
 func GeneratePrivate() ([]byte, error) {
