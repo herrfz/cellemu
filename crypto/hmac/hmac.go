@@ -8,8 +8,8 @@ import (
 func SHA256HMACGenerate(key, data []byte) []byte {
 	mac := hmac.New(sha256.New, key)
 	mac.Write(data)
-	sha256_mac := mac.Sum(nil)
-	return sha256_mac[:8] // truncate to first 8 Bytes
+	sha256Mac := mac.Sum(nil)
+	return sha256Mac[:8] // truncate to first 8 Bytes
 }
 
 func SHA256HMACVerify(key, data, msgmac []byte) ([]byte, bool) {

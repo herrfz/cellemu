@@ -7,20 +7,20 @@ import (
 	"time"
 )
 
-func DoSendData(app_dl_chan, app_ul_chan chan []byte) {
-	s_payload := "a001000008ad000017700000000000000000c6e0" // cf. AED temperature test app
-	payload, _ := hex.DecodeString(s_payload)
+func DoSendData(appDlCh, appUlCh chan []byte) {
+	sPayload := "a001000008ad000017700000000000000000c6e0" // cf. AED temperature test app
+	payload, _ := hex.DecodeString(sPayload)
 
 LOOP:
 	for {
 		select {
 		case <-time.Tick(time.Duration(rand.Intn(5)) + 5*1000*time.Millisecond): // add 5ms jitter
-			app_ul_chan <- payload
-			fmt.Println("sent sensor data:", s_payload)
+			appUlCh <- payload
+			fmt.Println("sent sensor data:", sPayload)
 
-		case _, more := <-app_dl_chan:
+		case _, more := <-appDlCh:
 			if !more {
-				close(app_ul_chan)
+				close(appUlCh)
 				break LOOP
 			}
 		}

@@ -27,7 +27,7 @@ func (msg *Message) GenerateMessage() []byte {
 	if msglen > 0 {
 		copy(buf[2:buflen-1], msg.data)
 	}
-	buf[buflen-1] = calc_checksum(buf[:buflen-1])
+	buf[buflen-1] = calcChecksum(buf[:buflen-1])
 
 	return buf
 }
@@ -43,7 +43,7 @@ func (msg *Message) ParseBuffer(buf []byte) error {
 	}
 
 	csum := buf[buflen-1]
-	expcsum := calc_checksum(buf[:buflen-1])
+	expcsum := calcChecksum(buf[:buflen-1])
 	if csum != expcsum {
 		return fmt.Errorf("invalid checksum")
 	}
@@ -74,12 +74,12 @@ func (s SerialReader) ReadDevice() ([]byte, error) {
 
 		s.serial.Read(buf)
 		ret[i] = buf[0] // next byte is length
-		len_in_msg := int(buf[0])
+		lenInMsg := int(buf[0])
 		i++
 
 		var mlen int
-		if len_in_msg < 128 { // never trust input
-			mlen = len_in_msg
+		if lenInMsg < 128 { // never trust input
+			mlen = lenInMsg
 		} else {
 			mlen = 128 // limit mlen to avoid overflow
 		}
@@ -96,7 +96,7 @@ func (s SerialReader) ReadDevice() ([]byte, error) {
 	}
 }
 
-func calc_checksum(data []byte) byte {
+func calcChecksum(data []byte) byte {
 	var csum = byte(0xff)
 	for i := range data {
 		csum -= data[i]
@@ -104,7 +104,7 @@ func calc_checksum(data []byte) byte {
 	return csum
 }
 
-func receive_with_timeout(rxch <-chan []byte, timeout time.Duration) ([]byte, error) {
+func receiveWithTimeout(rxch <-chan []byte, timeout time.Duration) ([]byte, error) {
 	select {
 	case <-time.After(timeout * time.Second):
 		return nil, fmt.Errorf("serial read timeout")
@@ -116,7 +116,7 @@ func receive_with_timeout(rxch <-chan []byte, timeout time.Duration) ([]byte, er
 
 // FOR LOOPBACK TESTING ONLY, simply exits when device not available
 // TODO: hard code path
-func test_write_serial(stopch chan bool) {
+func testWriteSerial(stopch chan bool) {
 	c := &serial.Config{Name: "/dev/pts/4", Baud: 9600}
 	s, err := serial.OpenPort(c)
 	if err != nil {
@@ -145,20 +145,20 @@ LOOP:
 			if err != nil {
 				fmt.Println("error parsing buffer:", err.Error())
 				debug := Message{4, buf}
-				msg_debug := debug.GenerateMessage()
-				s.Write(msg_debug)
+				msgDebug := debug.GenerateMessage()
+				s.Write(msgDebug)
 				continue
 			}
 
 			switch rcvd.mtype {
 			case 1:
-				hello_ack := Message{2, []byte{}}
-				msg_hello_ack := hello_ack.GenerateMessage()
-				s.Write(msg_hello_ack)
+				helloAck := Message{2, []byte{}}
+				msgHelloAck := helloAck.GenerateMessage()
+				s.Write(msgHelloAck)
 
 				test := Message{4, []byte{0xde, 0xad, 0xca, 0xfe}}
-				msg_test := test.GenerateMessage()
-				s.Write(msg_test)
+				msgTest := test.GenerateMessage()
+				s.Write(msgTest)
 
 			case 2:
 				continue
@@ -178,11 +178,11 @@ LOOP:
 			fmt.Println("test: written to serial:", hex.EncodeToString(buf))
 		}
 	}
-	fmt.Println("test_write_serial stopped")
+	fmt.Println("testWriteSerial stopped")
 }
 
 // main goroutine loop
-func DoSerialDataRequest(dl_chan, ul_chan chan []byte, device string) {
+func DoSerialDataRequest(dlCh, ulCh chan []byte, device string) {
 	// trailing LQI, ED, RX status, RX slot; TODO, all zeros for now
 	// I have to add one 0x00 to remove server error!! why!!
 	var trail = []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
@@ -200,14 +200,14 @@ func DoSerialDataRequest(dl_chan, ul_chan chan []byte, device string) {
 
 	// automatic serial sender just for testing
 	stopch := make(chan bool)
-	go test_write_serial(stopch)
+	go testWriteSerial(stopch)
 
 	// handshake
 	hello := Message{1, []byte{}}
-	msg_hello := hello.GenerateMessage()
-	s.Write(msg_hello)
-	fmt.Println("sent hello:", hex.EncodeToString(msg_hello), "waiting for ack...")
-	buf, err := receive_with_timeout(rxch, 10)
+	msgHello := hello.GenerateMessage()
+	s.Write(msgHello)
+	fmt.Println("sent hello:", hex.EncodeToString(msgHello), "waiting for ack...")
+	buf, err := receiveWithTimeout(rxch, 10)
 	fmt.Println("received hello ack:", hex.EncodeToString(buf))
 	if err != nil {
 		fmt.Println("error reading serial handshake:", err.Error())
@@ -223,27 +223,27 @@ func DoSerialDataRequest(dl_chan, ul_chan chan []byte, device string) {
 LOOP:
 	for {
 		select {
-		case buf, more := <-dl_chan:
+		case buf, more := <-dlCh:
 			if !more {
 				fmt.Println("stopping serial worker...")
-				close(ul_chan)
+				close(ulCh)
 				break LOOP
 			}
 
-			wdc_req := WDC_REQ{}
-			wdc_req.ParseWDCReq(buf)
-			if wdc_req.MSDULEN != len(wdc_req.MSDU) {
-				fmt.Println("MSDU length mismatch, on frame:", wdc_req.MSDULEN, ", received:", len(wdc_req.MSDU))
+			wdcReq := WDC_REQ{}
+			wdcReq.ParseWDCReq(buf)
+			if wdcReq.MSDULEN != len(wdcReq.MSDU) {
+				fmt.Println("MSDU length mismatch, on frame:", wdcReq.MSDULEN, ", received:", len(wdcReq.MSDU))
 				continue
 			}
 
-			MSDU := make([]byte, len(wdc_req.MSDU))
-			copy(MSDU, wdc_req.MSDU) // if I don't do this the MSDU gets corrupted!?!?!?
-			MPDU := MakeMPDU(wdc_req.DSTPAN, wdc_req.DSTADDR, []byte{0xff, 0xff}, []byte{0xff, 0xff}, MSDU)
+			MSDU := make([]byte, len(wdcReq.MSDU))
+			copy(MSDU, wdcReq.MSDU) // if I don't do this the MSDU gets corrupted!?!?!?
+			MPDU := MakeMPDU(wdcReq.DSTPAN, wdcReq.DSTADDR, []byte{0xff, 0xff}, []byte{0xff, 0xff}, MSDU)
 			app := Message{mtype: 3, data: MPDU}
-			msg_app := app.GenerateMessage()
-			s.Write(msg_app)
-			fmt.Println("written to serial:", hex.EncodeToString(msg_app))
+			msgApp := app.GenerateMessage()
+			s.Write(msgApp)
+			fmt.Println("written to serial:", hex.EncodeToString(msgApp))
 
 		case buf := <-rxch:
 			if len(buf) == 0 {
@@ -263,7 +263,7 @@ LOOP:
 
 			case 3:
 				ind := MakeWDCInd(rcvd.data, trail) // rcvd.data must be an MPDU
-				ul_chan <- ind
+				ulCh <- ind
 
 			case 4:
 				fmt.Println("received debug message:", hex.EncodeToString(rcvd.data))

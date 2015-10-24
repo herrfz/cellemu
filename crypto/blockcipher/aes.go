@@ -67,10 +67,10 @@ func AESDecryptCBC(key, ciphertext []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	tmp_ct := make([]byte, len(ciphertext))
-	copy(tmp_ct, ciphertext)
-	iv := tmp_ct[:aes.BlockSize]
-	pt := tmp_ct[aes.BlockSize:]
+	tmpct := make([]byte, len(ciphertext))
+	copy(tmpct, ciphertext)
+	iv := tmpct[:aes.BlockSize]
+	pt := tmpct[aes.BlockSize:]
 
 	if len(pt)%aes.BlockSize != 0 {
 		return nil, fmt.Errorf("ciphertext length is not a multiple of AES block: %s",
