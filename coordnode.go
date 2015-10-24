@@ -44,8 +44,8 @@ func main() {
 	flag.Parse()
 
 	// check serial devices
-	if *nodeSerial == "" && *wdcSerial == "" {
-		fmt.Println("no serial device provided")
+	if *wdcSerial == "" {
+		fmt.Println("serial connection to wdc is not provided")
 		os.Exit(1)
 	}
 
