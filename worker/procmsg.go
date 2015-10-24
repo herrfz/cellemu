@@ -3,7 +3,7 @@ package worker
 import (
 	"encoding/hex"
 	"fmt"
-	msg "github.com/herrfz/gowdc/messages"
+	msg "github.com/herrfz/coordnode/messages"
 )
 
 // process server/wdc messages, return nil if no response shall be sent
