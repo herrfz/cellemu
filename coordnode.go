@@ -91,7 +91,7 @@ func main() {
 			}
 
 			nodeAddr := make([]byte, 2)
-			binary.BigEndian.PutUint16(nodeAddr, uint16(addr))
+			binary.LittleEndian.PutUint16(nodeAddr, uint16(addr))
 
 			// channels for node's processing goroutine
 			dlCh := make(chan []byte)
