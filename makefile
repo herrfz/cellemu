@@ -1,7 +1,7 @@
 GOPATH ?= /home/vagrant/go
 
 amd64:
-	go build -o coordnode_amd64
+	go build
 
 arm:
 	docker run -v $(GOPATH):/root/go -w="/root/go/src/github.com/herrfz/coordnode" \

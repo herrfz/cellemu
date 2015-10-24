@@ -26,11 +26,7 @@ func DoDataRequest(b_addr []byte, dl_chan, ul_chan, app_dl_chan, app_ul_chan cha
 LOOP:
 	for {
 		select {
-		case payload, more := <-app_ul_chan:
-			if !more {
-				continue // give a chance to close dl_chan
-			}
-
+		case payload := <-app_ul_chan:
 			// uplink
 			ul_frame := UL_FRAME{auth: secure}
 			if secure {
@@ -67,7 +63,8 @@ LOOP:
 
 		case buf, more := <-dl_chan:
 			if !more {
-				fmt.Println("stopping CoordNode emulator...")
+				close(app_dl_chan)
+				<-app_ul_chan
 				close(ul_chan)
 				break LOOP // stop goroutine no more data
 			}
@@ -249,5 +246,5 @@ LOOP:
 
 		}
 	}
-	fmt.Println("CoordNode emulator stopped")
+	fmt.Println("node processor stopped")
 }
