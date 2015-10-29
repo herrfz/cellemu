@@ -39,7 +39,7 @@ func main() {
 	nodeSerial := flag.String("nodeSerial", "", "serial device to connect to node")
 	wdcSerial := flag.String("wdcSerial", "", "serial device to connect to wdc")
 	nJamming := flag.Int("nJamming", 0, "number of sensors sending jamming data")
-	nSensors := flag.Int("nSensors", 1, "number of sensors sending arbitrary data")
+	nSensors := flag.Int("nSensors", 0, "number of sensors sending arbitrary data")
 	secure := flag.Bool("sec", true, "apply security processing")
 	flag.Parse()
 
