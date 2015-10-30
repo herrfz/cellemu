@@ -41,6 +41,7 @@ func main() {
 	nJamming := flag.Int("nJamming", 0, "number of sensors sending jamming data")
 	nSensors := flag.Int("nSensors", 0, "number of sensors sending arbitrary data")
 	secure := flag.Bool("sec", true, "apply security processing")
+	forwarder := flag.Bool("forwarder", false, "read and forward data from real node")
 	flag.Parse()
 
 	// check serial devices
@@ -60,6 +61,9 @@ func main() {
 	}
 	for i := *nJamming; i < *nJamming+*nSensors; i++ {
 		mapApps[i] = app.DoSendData
+	}
+	if *forwarder {
+		mapApps[*nJamming+*nSensors] = app.DoForwardData
 	}
 
 	// configure serial device connecting to wdc
