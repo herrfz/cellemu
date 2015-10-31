@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/hex"
 	"fmt"
 	"github.com/herrfz/devreader"
 	"github.com/tarm/goserial"
@@ -12,7 +13,7 @@ type SerialReader struct {
 	serial io.ReadWriteCloser
 }
 
-func (s SerialReader) ReadDevice() ([]byte, error) {
+func (s SerialReader) ReadDevice() ([]byte, error) { // TODO: check protocol
 	buf := make([]byte, 128)
 	msgLen, _ := s.serial.Read(buf)
 	if msgLen > 0 {
@@ -22,8 +23,8 @@ func (s SerialReader) ReadDevice() ([]byte, error) {
 	}
 }
 
-func DoForwardData(appDlCh, appUlCh chan []byte) {
-	siface := &serial.Config{Name: "/dev/ttyUSB0", Baud: 9600} // TODO: check parameters
+func DoForwardData(appDlCh, appUlCh chan []byte, device string) {
+	siface := &serial.Config{Name: device, Baud: 9600} // TODO: check parameters
 	serReader, err := serial.OpenPort(siface)
 	if err != nil {
 		fmt.Println("error opening serial interface:", err.Error())
@@ -38,7 +39,7 @@ LOOP:
 		select {
 		case payload := <-serCh:
 			appUlCh <- payload
-			fmt.Println("forward sensor data:", payload)
+			fmt.Println("forward sensor data:", hex.EncodeToString(payload))
 
 		case _, more := <-appDlCh:
 			if !more {

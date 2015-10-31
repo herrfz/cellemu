@@ -30,7 +30,10 @@ func (s SerialReader) ReadDevice() ([]byte, error) {
 	}
 }
 
-type appFunction func(chan []byte, chan []byte)
+type node struct {
+	appFunction func(appDlCh, appUlCh chan []byte, device string)
+	device      string
+}
 
 var chPool [](chan []byte)
 var mutex = &sync.Mutex{} // protect uplink serial access to wdc; multiple node goroutines
@@ -38,10 +41,10 @@ var mutex = &sync.Mutex{} // protect uplink serial access to wdc; multiple node 
 func main() {
 	nodeSerial := flag.String("nodeSerial", "", "serial device to connect to node")
 	wdcSerial := flag.String("wdcSerial", "", "serial device to connect to wdc")
+	fwdSerial := flag.String("fwdSerial", "", "serial device to read and forward data from a real node")
 	nJamming := flag.Int("nJamming", 0, "number of sensors sending jamming data")
 	nSensors := flag.Int("nSensors", 0, "number of sensors sending arbitrary data")
 	secure := flag.Bool("sec", true, "apply security processing")
-	forwarder := flag.Bool("forwarder", false, "read and forward data from real node")
 	flag.Parse()
 
 	// check serial devices
@@ -55,15 +58,15 @@ func main() {
 	signal.Notify(intrCh, os.Interrupt)
 
 	// register total nodes and corresponding handler goroutines
-	mapApps := make(map[int]appFunction)
+	mapNodes := make(map[int]node)
 	for i := 0; i < *nJamming; i++ {
-		mapApps[i] = app.DoSendJamming
+		mapNodes[i] = node{app.DoSendJamming, ""}
 	}
 	for i := *nJamming; i < *nJamming+*nSensors; i++ {
-		mapApps[i] = app.DoSendData
+		mapNodes[i] = node{app.DoSendData, ""}
 	}
-	if *forwarder {
-		mapApps[*nJamming+*nSensors] = app.DoForwardData
+	if *fwdSerial != "" {
+		mapNodes[*nJamming+*nSensors] = node{app.DoForwardData, *fwdSerial}
 	}
 
 	// configure serial device connecting to wdc
@@ -77,7 +80,7 @@ func main() {
 	ser := SerialReader{serReader}
 	wdcCh := devreader.MakeChannel(ser)
 
-	for addr, fun := range mapApps {
+	for addr, curnode := range mapNodes {
 		// if nodeSerial is used, we just need one passthrough goroutine
 		if *nodeSerial != "" {
 			dlCh := make(chan []byte)
@@ -87,7 +90,7 @@ func main() {
 		}
 
 		// otherwise, start one goroutine per node
-		go func(addr int, fun appFunction) {
+		go func(addr int, curnode node) {
 			coord := false
 			if addr == 0 {
 				// first node shall be coordinator
@@ -106,7 +109,7 @@ func main() {
 			appDlCh := make(chan []byte)
 			appUlCh := make(chan []byte)
 
-			go fun(appDlCh, appUlCh)
+			go curnode.appFunction(appDlCh, appUlCh, curnode.device)
 			go worker.DoDataRequest(nodeAddr, dlCh, ulCh, appDlCh, appUlCh, *secure)
 
 		LOOP:
@@ -146,7 +149,7 @@ func main() {
 				}
 			}
 			fmt.Println("node stopped")
-		}(addr, fun)
+		}(addr, curnode)
 	}
 
 MAINLOOP:
