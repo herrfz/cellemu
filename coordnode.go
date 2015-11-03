@@ -22,11 +22,11 @@ type SerialReader struct {
 // SerialReader defines ReadDevice, means it implements devreader interface
 func (s SerialReader) ReadDevice() ([]byte, error) {
 	buf := make([]byte, 128)
-	msgLen, _ := s.serial.Read(buf)
-	if msgLen > 0 {
+	msgLen, err := s.serial.Read(buf)
+	if msgLen > 0 && err != nil {
 		return buf[:msgLen], nil
 	} else {
-		return []byte{}, nil
+		return []byte{}, err
 	}
 }
 
