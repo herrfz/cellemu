@@ -23,7 +23,7 @@ type SerialReader struct {
 func (s SerialReader) ReadDevice() ([]byte, error) {
 	buf := make([]byte, 128)
 	msgLen, err := s.serial.Read(buf)
-	if msgLen > 0 && err != nil {
+	if msgLen > 0 && err == nil {
 		return buf[:msgLen], nil
 	} else {
 		return []byte{}, err
@@ -126,7 +126,7 @@ func main() {
 						wdcRes := worker.ProcessMessage(wdcReq)
 						if wdcRes != nil {
 							mutex.Lock()
-							serReader.Write(wdcRes)
+							serReader.Write(wdcRes) // ignore error on wdc serial write
 							mutex.Unlock()
 							fmt.Println("sent answer to WDC request")
 						}
@@ -143,7 +143,7 @@ func main() {
 
 				case nodeInd := <-ulCh:
 					mutex.Lock()
-					serReader.Write(nodeInd)
+					serReader.Write(nodeInd) // ignore error on wdc serial write
 					mutex.Unlock()
 					fmt.Println("sent node uplink message")
 				}
