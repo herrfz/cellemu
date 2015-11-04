@@ -92,7 +92,7 @@ func (s SerialReader) ReadDevice() ([]byte, error) {
 		return ret[:mlen], nil
 
 	} else {
-		return []byte{}, nil
+		return []byte{}, err
 	}
 }
 

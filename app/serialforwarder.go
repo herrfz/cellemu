@@ -13,18 +13,25 @@ type SerialReader struct {
 	serial io.ReadWriteCloser
 }
 
-func (s SerialReader) ReadDevice() ([]byte, error) { // TODO: check protocol
-	buf := make([]byte, 128)
-	msgLen, _ := s.serial.Read(buf)
-	if msgLen > 0 {
-		return buf[:msgLen], nil
+func (s SerialReader) ReadDevice() ([]byte, error) {
+	buf := make([]byte, 1)
+	_, err := s.serial.Read(buf)
+	msgLen := int(buf[0])         // first byte is length
+	if msgLen > 0 && err == nil { // no max length checking here...
+		ret := make([]byte, msgLen)
+		_, err = s.serial.Read(ret) // read as many bytes as length
+		if err == nil {
+			return append(buf, ret...), nil // rejoin length field and the rest
+		} else {
+			return []byte{}, err
+		}
 	} else {
-		return []byte{}, nil
+		return []byte{}, err
 	}
 }
 
 func DoForwardData(appDlCh, appUlCh chan []byte, device string) {
-	siface := &serial.Config{Name: device, Baud: 9600} // TODO: check parameters
+	siface := &serial.Config{Name: device, Baud: 57600}
 	serReader, err := serial.OpenPort(siface)
 	if err != nil {
 		fmt.Println("error opening serial interface:", err.Error())
