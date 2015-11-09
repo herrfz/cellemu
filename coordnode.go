@@ -41,7 +41,7 @@ var mutex = &sync.Mutex{} // protect uplink serial access to wdc; multiple node 
 func main() {
 	nodeSerial := flag.String("nodeSerial", "", "serial device to connect to node")
 	wdcSerial := flag.String("wdcSerial", "", "serial device to connect to wdc")
-	fwdSerial := flag.String("fwdSerial", "", "serial device to read and forward data from a real node")
+	fwdSerial := flag.String("fwdSerial", "", "serial device to read and forward data from a real node") // TODO: enable list of serial interfaces
 	nJamming := flag.Int("nJamming", 0, "number of sensors sending jamming data")
 	nSensors := flag.Int("nSensors", 0, "number of sensors sending arbitrary data")
 	secure := flag.Bool("sec", true, "apply security processing")

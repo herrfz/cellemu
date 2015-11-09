@@ -21,7 +21,16 @@ func (s SerialReader) ReadDevice() ([]byte, error) {
 		ret := make([]byte, msgLen)
 		_, err = s.serial.Read(ret) // read as many bytes as length
 		if err == nil {
-			return append(buf, ret...), nil // rejoin length field and the rest
+			msg := append(buf, ret...)               // rejoin length field and the rest
+			nfc, _ := hex.DecodeString("3C4E46433E") // the string "<NFC>"
+			j := 4                                   // the check string <NFC> starts on byte 4 (5th byte from start)
+			for _, c := range nfc {
+				if c != msg[j] {
+					return []byte{}, fmt.Errorf("DONTPANIC") // return early with non-critical error if check string fails
+				}
+				j++
+			}
+			return msg, nil // if check string passes, return msg
 		} else {
 			return []byte{}, err
 		}
@@ -46,7 +55,7 @@ LOOP:
 		select {
 		case payload := <-serCh:
 			appUlCh <- payload
-			fmt.Println("forward sensor data:", hex.EncodeToString(payload))
+			fmt.Println("forward sensor data:", string(payload))
 
 		case _, more := <-appDlCh:
 			if !more {
