@@ -15,27 +15,49 @@ type SerialReader struct {
 
 func (s SerialReader) ReadDevice() ([]byte, error) {
 	buf := make([]byte, 1)
-	_, err := s.serial.Read(buf)
-	msgLen := int(buf[0])         // first byte is length
-	if msgLen > 0 && err == nil { // no max length checking here...
-		ret := make([]byte, msgLen)
-		_, err = s.serial.Read(ret) // read as many bytes as length
-		if err == nil {
-			msg := append(buf, ret...)               // rejoin length field and the rest
-			nfc, _ := hex.DecodeString("3C4E46433E") // the string "<NFC>"
-			j := 4                                   // the check string <NFC> starts on byte 4 (5th byte from start)
-			for _, c := range nfc {
-				if c != msg[j] {
-					return []byte{}, fmt.Errorf("DONTPANIC") // return early with non-critical error if check string fails
-				}
-				j++
-			}
-			return msg, nil // if check string passes, return msg
-		} else {
+	lsr := make([]byte, 9)
+	header := make([]byte, 9)
+	state := 0
+	checkString, _ := hex.DecodeString("3C4E46433E") // the string "<NFC>"
+	idx := 0
+
+	for {
+		_, err := s.serial.Read(buf)
+		if err != nil {
 			return []byte{}, err
 		}
-	} else {
-		return []byte{}, err
+
+		for i := 8; i > 0; i-- { // most recent byte pushes register to the left
+			lsr[i] = lsr[i-1]
+		}
+		lsr[0] = buf[0]
+
+		if buf[0] == checkString[idx] {
+			idx++
+			state++
+			if state == 5 {
+				// construct packet and return
+				remLen := int(lsr[8]) - 8
+				rest := make([]byte, remLen)
+				_, err := s.serial.Read(rest)
+				if err != nil {
+					return []byte{}, err
+				} else {
+					for i := 0; i < 9; i++ {
+						header[i] = lsr[9-i-1]
+					}
+					return append(header, rest...), nil
+				}
+
+			} else { // going well but not at state 5 yet, read further
+				continue
+			}
+
+		} else { // read-byte not in check string, continue reading (exhaust the buffer)
+			state = 0
+			idx = 0
+			continue
+		}
 	}
 }
 
@@ -55,7 +77,7 @@ LOOP:
 		select {
 		case payload := <-serCh:
 			appUlCh <- payload
-			fmt.Println("forward sensor data:", string(payload))
+			fmt.Printf("read nfc data\n- ascii: %s\n- hex: %x\n", string(payload), string(payload))
 
 		case _, more := <-appDlCh:
 			if !more {
