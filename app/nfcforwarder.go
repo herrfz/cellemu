@@ -86,5 +86,5 @@ LOOP:
 			}
 		}
 	}
-	fmt.Println("stopped forwarding sensor data")
+	fmt.Println("stopped forwarding nfc data")
 }
