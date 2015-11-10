@@ -1,7 +1,6 @@
 package app
 
 import (
-	"encoding/hex"
 	"fmt"
 	"github.com/herrfz/devreader"
 	"github.com/tarm/goserial"
@@ -18,7 +17,7 @@ func (s SerialReader) ReadDevice() ([]byte, error) {
 	lsr := make([]byte, 9)
 	header := make([]byte, 9)
 	state := 0
-	checkString, _ := hex.DecodeString("3C4E46433E") // the string "<NFC>"
+	checkString := "<NFC>"
 
 	for {
 		_, err := s.serial.Read(buf)
