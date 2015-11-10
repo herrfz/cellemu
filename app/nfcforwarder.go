@@ -19,7 +19,6 @@ func (s SerialReader) ReadDevice() ([]byte, error) {
 	header := make([]byte, 9)
 	state := 0
 	checkString, _ := hex.DecodeString("3C4E46433E") // the string "<NFC>"
-	idx := 0
 
 	for {
 		_, err := s.serial.Read(buf)
@@ -32,8 +31,7 @@ func (s SerialReader) ReadDevice() ([]byte, error) {
 		}
 		lsr[0] = buf[0]
 
-		if buf[0] == checkString[idx] {
-			idx++
+		if buf[0] == checkString[state] {
 			state++
 			if state == 5 {
 				// construct packet and return
@@ -55,7 +53,6 @@ func (s SerialReader) ReadDevice() ([]byte, error) {
 
 		} else { // read-byte not in check string, continue reading (exhaust the buffer)
 			state = 0
-			idx = 0
 			continue
 		}
 	}
