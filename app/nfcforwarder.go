@@ -14,10 +14,10 @@ type SerialReader struct {
 
 func (s SerialReader) ReadDevice() ([]byte, error) {
 	buf := make([]byte, 1)
-	lsr := make([]byte, 9)
-	header := make([]byte, 9)
+	lsr := make([]byte, 18)
+	header := make([]byte, 18) // header := packet header until the space after check string
 	state := 0
-	checkString := "<NFC>"
+	checkString := "< N F C > "
 
 	for {
 		_, err := s.serial.Read(buf)
@@ -25,23 +25,23 @@ func (s SerialReader) ReadDevice() ([]byte, error) {
 			return []byte{}, err
 		}
 
-		for i := 8; i > 0; i-- { // most recent byte pushes register to the left
+		for i := 17; i > 0; i-- { // most recent byte pushes register to the left
 			lsr[i] = lsr[i-1]
 		}
 		lsr[0] = buf[0]
 
 		if buf[0] == checkString[state] {
 			state++
-			if state == 5 {
+			if state == 10 {
 				// construct packet and return
-				remLen := int(lsr[8]) - 8
+				remLen := 2*int(lsr[17]) - 16 // times two to take the whitespaces into account
 				rest := make([]byte, remLen)
 				_, err := s.serial.Read(rest)
 				if err != nil {
 					return []byte{}, err
 				} else {
-					for i := 0; i < 9; i++ {
-						header[i] = lsr[9-i-1]
+					for i := 0; i < 18; i++ {
+						header[i] = lsr[18-i-1]
 					}
 					return append(header, rest...), nil
 				}
