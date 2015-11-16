@@ -1,0 +1,133 @@
+<\n>
+Sniffed packet:<\n>
+Packet #   1 - Time:  50s 986ms 468us 006cyc<\n>
+ = rel: +   0.457s - Status: 0x0205 - Error Code: 0x01 - Packet Length:  24<\n>
+Complete Packet:<\n>
+<\n>
+ASCI:<\n>
+<24> <2> <\0> <5> < N F C > B a v a r i a < / N F C > <\0> ? m <\n>
+HEX:<\n>
+18 02 00 05 3C 4E 46 43 3E 42 61 76 61 72 69 61 3C 2F 4E 46 43 3E 00 83 6D <\n>
+<\n>
+<\n>
+Sniffed packet:<\n>
+Packet #   2 - Time: 162s 399ms 221us 003cyc<\n>
+ = rel: +111.412s - Status: 0x0207 - Error Code: 0x00 - Packet Length:  77<\n>
+Complete Packet:<\n>
+<\n>
+ASCI:<\n>
+M ? 4 ? <\b> y <\0> ? ? <21> <30> ! <28> 4 - <20> ? ? <26> ? 6 i 3 ? <30> <\0> <\n>
+ <1> ? <\0>   <\0> 0 ?   <1> <3> a <18> ? <\0> c P <\0> <\b> <\0> <\0> <\0> <\0> <3> <\0> ` I <3> <\0> $ ! <1> <\0> $ <16> _ <19> $ ? <3> <\0> <1> <16>   a <16> 0 <31> <\0> <\0> <\0> " <\n>
+HEX:<\n>
+4D BF 34 D8 08 79 00 F0 EA 15 1E 21 1C 34 2D 14 E7 AA 1A 8A 36 69 33 D5 1E 00 0A 01 E3 00 20 00 30 F0 20 01 03 61 12 F2 00 63 50 00 08 00 00 00 00 03 00 60 49 03 00 24 21 01 00 24 10 5F 13 24 80 03 00 01 10 20 61 10 30 1F 00 00 00 22 <\n>
+<\n>
+<\n>
+Sniffed packet:<\n>
+Packet #   3 - Time: 163s 313ms 353us 022cyc<\n>
+ = rel: +   0.914s - Status: 0x0205 - Error Code: 0x01 - Packet Length:  24<\n>
+Complete Packet:<\n>
+<\n>
+ASCI:<\n>
+<24> <2> <\0> ? < N F C > B a v a r i a < / N F C > <\0> D ? <\n>
+HEX:<\n>
+18 02 00 8F 3C 4E 46 43 3E 42 61 76 61 72 69 61 3C 2F 4E 46 43 3E 00 44 DC <\n>
+<\n>
+<\n>
+Sniffed packet:<\n>
+Packet #   4 - Time: 163s 771ms 268us 004cyc<\n>
+ = rel: +   0.457s - Status: 0x0205 - Error Code: 0x01 - Packet Length:  24<\n>
+Complete Packet:<\n>
+<\n>
+ASCI:<\n>
+<24> <2> <\0> ? < N F C > B a v a r i a < / N F C > <\0> ? ? <\n>
+HEX:<\n>
+18 02 00 90 3C 4E 46 43 3E 42 61 76 61 72 69 61 3C 2F 4E 46 43 3E 00 AF 87 <\n>
+<\n>
+<\n>
+Sniffed packet:<\n>
+Packet #   5 - Time: 164s 229ms 182us 013cyc<\n>
+ = rel: +   0.457s - Status: 0x0205 - Error Code: 0x01 - Packet Length:  24<\n>
+Complete Packet:<\n>
+<\n>
+ASCI:<\n>
+<24> <2> <\0> ? < N F C > B a v a r i a < / N F C > <\0> ? X <\n>
+HEX:<\n>
+18 02 00 91 3C 4E 46 43 3E 42 61 76 61 72 69 61 3C 2F 4E 46 43 3E 00 F9 58 <\n>
+<\n>
+<\n>
+Sniffed packet:<\n>
+Packet #   6 - Time: 164s 687ms 097us 000cyc<\n>
+ = rel: +   0.457s - Status: 0x0205 - Error Code: 0x01 - Packet Length:  24<\n>
+Complete Packet:<\n>
+<\n>
+ASCI:<\n>
+<24> <2> <\0> ? < N F C > B a v a r i a < / N F C > <\0> <18> 1 <\n>
+HEX:<\n>
+18 02 00 92 3C 4E 46 43 3E 42 61 76 61 72 69 61 3C 2F 4E 46 43 3E 00 12 31 <\n>
+<\n>
+<\n>
+Sniffed packet:<\n>
+Packet #   7 - Time: 165s 145ms 011us 011cyc<\n>
+ = rel: +   0.457s - Status: 0x0205 - Error Code: 0x01 - Packet Length:  24<\n>
+Complete Packet:<\n>
+<\n>
+ASCI:<\n>
+<24> <2> <\0> ? < N F C > B a v a r i a < / N F C > <\0> D ? <\n>
+HEX:<\n>
+18 02 00 93 3C 4E 46 43 3E 42 61 76 61 72 69 61 3C 2F 4E 46 43 3E 00 44 EE <\n>
+<\n>
+<\n>
+Sniffed packet:<\n>
+Packet #   8 - Time: 165s 602ms 925us 022cyc<\n>
+ = rel: +   0.457s - Status: 0x0205 - Error Code: 0x01 - Packet Length:  24<\n>
+Complete Packet:<\n>
+<\n>
+ASCI:<\n>
+<24> <2> <\0> ? < N F C > B a v a r i a < / N F C > <\0> ? ? <\n>
+HEX:<\n>
+18 02 00 94 3C 4E 46 43 3E 42 61 76 61 72 69 61 3C 2F 4E 46 43 3E 00 C4 E2 <\n>
+<\n>
+<\n>
+Sniffed packet:<\n>
+Packet #   9 - Time: 166s 524ms 514us 016cyc<\n>
+ = rel: +   0.921s - Status: 0x0207 - Error Code: 0x01 - Packet Length: 204<\n>
+Complete Packet:<\n>
+<\n>
+ASCI:<\n>
+? ? M ? <15> { <17> <30> <9> <14> <30> A < F <21> ? w k ? <1> ? j ; $ ? <\0> ? @ <1> d <\0> <19> <2> ! <\0> q P <16> <2> ) <\b> ? <1> 0 <21> ? <\0> <2> <2> <24> ! <18> <26> s 0 <\n>
+ <1> <16> <6> A ) <18> <\0> <2> <1> ?   <\0> <11> 0 ! <20> ? <24> 0 <\0> 6 Q ? <17> <3> ?   1 < P <16> <3> C <7> <\0> <\0> <\0> <21> <21> d <\0> 4 <31> <5> <2> 0 <17> <16> <16> <\0> ? <\0> ! <\f> 0 ` 3 <\r> <16> 2 @ <5> <7>   <2> L <20> <21> <3> b 0 ? <\0> <16> <16> <7> <3> <\0> <17> <18> 1 <\0> p <2> <2> <3> <\0> 2 <\0> <1> ? K ? 7 7 " <11> ? ? ? ? ? N ? d a <25> f ? ? ? ? M ? \ ? ? ? Q ? ^ <\0> <20> ? K ? & ? ? 9 ? ? ?   m ? " I <20> <22> ? ? k <21> ? ? ? <29> ? <\n>
+HEX:<\n>
+CC B5 4D D9 0F 7B 11 1E 09 0E 1E 41 3C 46 15 96 77 6B F9 01 F0 6A 3B 24 A0 00 C2 40 01 64 00 13 02 21 00 71 50 10 02 29 08 93 01 30 15 A0 00 02 02 18 21 12 1A 73 30 0A 01 10 06 41 29 12 00 02 01 D1 20 00 0B 30 21 14 A2 18 30 00 36 51 82 11 03 B9 20 31 3C 50 10 03 43 07 00 00 00 15 15 64 00 34 1F 05 02 30 11 10 10 00 B3 00 21 0C 30 60 33 0D 10 32 40 05 07 20 02 4C 14 15 03 62 30 BC 00 10 10 07 03 00 11 12 31 00 70 02 02 03 00 32 00 01 B7 4B 83 37 37 22 0B AA 80 B5 E8 C5 4E F7 64 61 19 66 AD B1 C2 D3 4D BF 5C B9 A6 F2 51 96 5E 00 14 FE 4B 8A 26 BC 92 39 86 F8 A4 20 6D 9D 22 49 14 16 B2 80 6B 15 AC 97 8A 1D D5 <\n>
+<\n>
+<\n>
+Sniffed packet:<\n>
+Packet #  10 - Time: 166s 976ms 668us 023cyc<\n>
+ = rel: +   0.452s - Status: 0x0205 - Error Code: 0x01 - Packet Length:  24<\n>
+Complete Packet:<\n>
+<\n>
+ASCI:<\n>
+<24> <2> <\0> ? < N F C > B a v a r i a < / N F C > <\0> / ? <\n>
+HEX:<\n>
+18 02 00 97 3C 4E 46 43 3E 42 61 76 61 72 69 61 3C 2F 4E 46 43 3E 00 2F 8B <\n>
+<\n>
+<\n>
+Sniffed packet:<\n>
+Packet #  11 - Time: 167s 434ms 583us 011cyc<\n>
+ = rel: +   0.457s - Status: 0x0205 - Error Code: 0x01 - Packet Length:  24<\n>
+Complete Packet:<\n>
+<\n>
+ASCI:<\n>
+<24> <2> <\0> ? < N F C > B a v a r i a < / N F C > <\0> y M <\n>
+HEX:<\n>
+18 02 00 98 3C 4E 46 43 3E 42 61 76 61 72 69 61 3C 2F 4E 46 43 3E 00 79 4D <\n>
+<\n>
+<\n>
+Sniffed packet:<\n>
+Packet #  12 - Time: 167s 892ms 497us 017cyc<\n>
+ = rel: +   0.457s - Status: 0x0205 - Error Code: 0x01 - Packet Length:  24<\n>
+Complete Packet:<\n>
+<\n>
+ASCI:<\n>
+<24> <2> <\0> ? < N F C > B a v a r i a < / N F C > <\0> / ? <\n>
+HEX:<\n>
+18 02 00 99 3C 4E 46 43 3E 42 61 76 61 72 69 61 3C 2F 4E 46 43 3E 00 2F 92 <\n>

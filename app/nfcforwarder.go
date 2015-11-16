@@ -1,6 +1,8 @@
 package app
 
 import (
+	"bytes"
+	"encoding/hex"
 	"fmt"
 	"github.com/herrfz/devreader"
 	"github.com/tarm/goserial"
@@ -13,11 +15,13 @@ type SerialReader struct {
 }
 
 func (s SerialReader) ReadDevice() ([]byte, error) {
+	BUFSIZE := 27 // 1B length, 2B header, 1B seq nr, 5B <NFC>. each byte translates into three characters: 2chr hex + space
 	buf := make([]byte, 1)
-	lsr := make([]byte, 18)
-	header := make([]byte, 18) // header := packet header until the space after check string
+	lsr := make([]byte, BUFSIZE)
+	header := make([]byte, BUFSIZE) // header := packet header until the space after check string
 	state := 0
-	checkString := "< N F C > "
+	checkString := "3C 4E 46 43 3E " // the string "< N F C > " in hex
+	endState := len(checkString)
 
 	for {
 		_, err := s.serial.Read(buf)
@@ -25,28 +29,38 @@ func (s SerialReader) ReadDevice() ([]byte, error) {
 			return []byte{}, err
 		}
 
-		for i := 17; i > 0; i-- { // most recent byte pushes register to the left
+		for i := BUFSIZE - 1; i > 0; i-- { // most recent byte pushes register to the left
 			lsr[i] = lsr[i-1]
 		}
 		lsr[0] = buf[0]
 
 		if buf[0] == checkString[state] {
 			state++
-			if state == 10 {
+			if state == endState {
 				// construct packet and return
-				remLen := 2*int(lsr[17]) - 16 // times two to take the whitespaces into account
+				lengthBytes := []byte{lsr[BUFSIZE-1], lsr[BUFSIZE-2]}
+				tempLen, _ := hex.DecodeString(string(lengthBytes))
+				remLen := 3*int(tempLen[0]) - 24 // times three to take the ascii encoding, i.e. one byte is encoded as two character ascii (e.g. 18 is a one and an eight), and the whitespaces into account
 				rest := make([]byte, remLen)
 				_, err := s.serial.Read(rest)
 				if err != nil {
 					return []byte{}, err
 				} else {
-					for i := 0; i < 18; i++ {
-						header[i] = lsr[18-i-1]
+					for i := 0; i < BUFSIZE; i++ {
+						header[i] = lsr[BUFSIZE-i-1]
 					}
-					return append(header, rest...), nil
+					packetString := append(header, rest...)
+					var packet bytes.Buffer
+					for i := 0; i < len(packetString); i++ {
+						if i%3 != 2 { // remove every third character; it's a space
+							packet.WriteByte(packetString[i])
+						}
+					}
+					ret, _ := hex.DecodeString(packet.String())
+					return ret, nil
 				}
 
-			} else { // going well but not at state 5 yet, read further
+			} else { // going well but not at end state yet, read further
 				continue
 			}
 
