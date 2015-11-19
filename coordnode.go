@@ -123,13 +123,15 @@ func main() {
 					}
 
 					if coord {
-						wdcRes := worker.ProcessMessage(wdcReq)
-						if wdcRes != nil {
-							mutex.Lock()
-							serReader.Write(wdcRes) // ignore error on wdc serial write
-							mutex.Unlock()
-							fmt.Println("sent answer to WDC request")
-						}
+						go func() { // process wdc message in a separate goroutine
+							wdcRes := worker.ProcessMessage(wdcReq)
+							if wdcRes != nil {
+								mutex.Lock()
+								serReader.Write(wdcRes) // ignore error on wdc serial write
+								mutex.Unlock()
+								fmt.Println("sent answer to WDC request")
+							}
+						}()
 					}
 					// if MAC_DATA_REQUEST, pass it to node's processing goroutine
 					// can either be local handler or serial forwarder
