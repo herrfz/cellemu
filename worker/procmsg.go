@@ -9,8 +9,7 @@ import (
 // process server/wdc messages, return nil if no response shall be sent
 func ProcessMessage(buf []byte) []byte {
 	if len(buf) == 0 {
-		dummy := make([]byte, 0)
-		return dummy
+		return nil
 	}
 
 	switch buf[1] {
@@ -37,7 +36,6 @@ func ProcessMessage(buf []byte) []byte {
 		return msg.WDC_RESET_REQ_ACK
 
 	case 0x10:
-		fmt.Println("received WDC sync")
 		fmt.Println("WDC sync-ed")
 		return nil
 

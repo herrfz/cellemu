@@ -116,14 +116,8 @@ func main() {
 			for {
 				select {
 				case wdcReq, more := <-wdcCh:
-					if !more {
-						close(dlCh)
-						<-ulCh
-						break LOOP
-					}
-
-					if coord {
-						go func() { // process wdc message in a separate goroutine
+					go func(wdcReq []byte) { // process wdc message in a separate goroutine
+						if coord {
 							wdcRes := worker.ProcessMessage(wdcReq)
 							if wdcRes != nil {
 								mutex.Lock()
@@ -131,16 +125,22 @@ func main() {
 								mutex.Unlock()
 								fmt.Println("sent answer to WDC request")
 							}
-						}()
-					}
-					// if MAC_DATA_REQUEST, pass it to node's processing goroutine
-					// can either be local handler or serial forwarder
-					if len(wdcReq) != 0 && wdcReq[1] == 0x17 {
-						reqmsg := worker.WDC_REQ{}
-						reqmsg.ParseWDCReq([]byte(wdcReq))
-						if bytes.Equal(reqmsg.DSTADDR, nodeAddr) { // only process message that is sent to us
-							dlCh <- []byte(wdcReq)
 						}
+
+						// if MAC_DATA_REQUEST, pass it to node's processing goroutine
+						// can either be local handler or serial forwarder
+						if len(wdcReq) != 0 && wdcReq[1] == 0x17 {
+							reqmsg := worker.WDC_REQ{}
+							reqmsg.ParseWDCReq([]byte(wdcReq))
+							if bytes.Equal(reqmsg.DSTADDR, nodeAddr) { // only process message that is sent to us
+								dlCh <- []byte(wdcReq)
+							}
+						}
+					}(wdcReq)
+
+					if !more {
+						close(dlCh)
+						break LOOP
 					}
 
 				case nodeInd := <-ulCh:
