@@ -135,7 +135,7 @@ func main() {
 						if len(wdcReq) != 0 && wdcReq[1] == 0x17 {
 							reqmsg := worker.WDC_REQ{}
 							reqmsg.ParseWDCReq([]byte(wdcReq))
-							if bytes.Equal(reqmsg.DSTADDR, nodeAddr) { // only process message that is sent to us
+							if bytes.Equal(reqmsg.DSTADDR, nodeAddr) || bytes.Equal(reqmsg.DSTADDR, []byte{0xff, 0xff}) { // only process message that is sent to us or broadcast
 								dlCh <- []byte(wdcReq)
 							}
 						}
