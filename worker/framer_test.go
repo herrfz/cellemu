@@ -7,6 +7,7 @@ import (
 )
 
 func TestMakeMPDU(t *testing.T) {
+	fcf := []byte{0x01, 0x88}
 	dstpan := []byte{0x1c, 0xaa}
 	dstaddr := []byte{0x00, 0x00}
 	srcpan := []byte{0xff, 0xff}
@@ -14,7 +15,7 @@ func TestMakeMPDU(t *testing.T) {
 	msdu := []byte{0xde, 0xad, 0xbe, 0xef}
 	out := []byte{0x01, 0x88, 0x00, 0x1c, 0xaa, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xde, 0xad, 0xbe, 0xef, 0xde, 0xad}
 
-	if mpdu := MakeMPDU(dstpan, dstaddr, srcpan, srcaddr, msdu); !bytes.Equal(mpdu, out) {
+	if mpdu := MakeMPDU(fcf, dstpan, dstaddr, srcpan, srcaddr, msdu); !bytes.Equal(mpdu, out) {
 		t.Errorf("TestMakeRequest wrong output: %v, expected: %v", hex.EncodeToString(mpdu), hex.EncodeToString(out))
 	}
 }
