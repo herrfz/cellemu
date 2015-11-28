@@ -76,6 +76,12 @@ LOOP:
 
 			wdcReq := WDC_REQ{}
 			wdcReq.ParseWDCReq(buf)
+
+			if len(wdcReq.MSDU) == 0 {
+				fmt.Println("zero length MSDU")
+				continue
+			}
+
 			if wdcReq.MSDULEN != len(wdcReq.MSDU) {
 				fmt.Println("MSDU length mismatch, on frame:", wdcReq.MSDULEN, ", received:", len(wdcReq.MSDU))
 				continue
