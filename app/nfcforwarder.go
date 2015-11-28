@@ -8,6 +8,7 @@ import (
 	"github.com/tarm/goserial"
 	"io"
 	"os"
+	"regexp"
 )
 
 type SerialReader struct {
@@ -22,6 +23,7 @@ func (s SerialReader) ReadDevice() ([]byte, error) {
 	state := 0
 	checkString := "3C 4E 46 43 3E " // the string "< N F C > " in hex
 	endState := len(checkString)
+	re := regexp.MustCompile("<NFC>(.*)</NFC>")
 
 	for {
 		_, err := s.serial.Read(buf)
@@ -56,8 +58,8 @@ func (s SerialReader) ReadDevice() ([]byte, error) {
 							packet.WriteByte(packetString[i])
 						}
 					}
-					ret, _ := hex.DecodeString(packet.String())
-					return ret, nil
+					wholePacket, _ := hex.DecodeString(packet.String())
+					return re.FindSubmatch(wholePacket)[1], nil // only return the text between tags
 				}
 
 			} else { // going well but not at end state yet, read further
