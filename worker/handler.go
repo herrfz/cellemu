@@ -12,11 +12,12 @@ import (
 	"sync"
 )
 
-func DoDataRequest(nodeAddr []byte, dlCh, ulCh, appDlCh, appUlCh chan []byte, secure bool) {
+func DoDataRequest(nodeAddr []byte, dlCh, ulCh, appDlCh, appUlCh, crossCh chan []byte, secure bool) {
 	var NIK, S, AK, SIK, SCK []byte
 	var UL_POLICY byte
 	var COUNTER_BYTE = make([]byte, 4)
 	var COUNTER uint32 = 0
+	var nfcData = make([]byte, 6)
 	// trailing LQI, ED, RX status, RX slot; TODO, all zeros for now
 	var trail = []byte{0x00, 0x00, 0x00, 0x00, 0x00}
 
@@ -26,6 +27,9 @@ func DoDataRequest(nodeAddr []byte, dlCh, ulCh, appDlCh, appUlCh chan []byte, se
 LOOP:
 	for {
 		select {
+		case appData := <-crossCh: // allow application to send misc data
+			copy(nfcData, appData) // do nothing, just store
+
 		case payload := <-appUlCh:
 			// uplink
 			ulFrame := UL_FRAME{auth: secure}

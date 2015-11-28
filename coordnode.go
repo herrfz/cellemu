@@ -31,7 +31,7 @@ func (s SerialReader) ReadDevice() ([]byte, error) {
 }
 
 type node struct {
-	appFunction func(appDlCh, appUlCh chan []byte, device string)
+	appFunction func(appDlCh, appUlCh, crossCh chan []byte, device string)
 	device      string
 }
 
@@ -109,8 +109,11 @@ func main() {
 			appDlCh := make(chan []byte)
 			appUlCh := make(chan []byte)
 
-			go curnode.appFunction(appDlCh, appUlCh, curnode.device)
-			go worker.DoDataRequest(nodeAddr, dlCh, ulCh, appDlCh, appUlCh, *secure)
+			// channel for sharing data between worker and app
+			crossCh := make(chan []byte)
+
+			go curnode.appFunction(appDlCh, appUlCh, crossCh, curnode.device)
+			go worker.DoDataRequest(nodeAddr, dlCh, ulCh, appDlCh, appUlCh, crossCh, *secure)
 
 		LOOP:
 			for {

@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func DoSendData(appDlCh, appUlCh chan []byte, device string) {
+func DoSendData(appDlCh, appUlCh, crossCh chan []byte, device string) {
 	sPayload := "a001000008ad000017700000000000000000c6e0" // cf. AED temperature test app
 	payload, _ := hex.DecodeString(sPayload)
 

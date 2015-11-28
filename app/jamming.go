@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func DoSendJamming(appDlCh, appUlCh chan []byte, device string) {
+func DoSendJamming(appDlCh, appUlCh, crossCh chan []byte, device string) {
 	ED := byte(0)
 	basePayload := []byte{0x00, 0x01, // battery voltage
 		0x00, 0x10} // temperature

@@ -71,7 +71,7 @@ func (s SerialReader) ReadDevice() ([]byte, error) {
 	}
 }
 
-func DoForwardData(appDlCh, appUlCh chan []byte, device string) {
+func DoForwardData(appDlCh, appUlCh, crossCh chan []byte, device string) {
 	siface := &serial.Config{Name: device, Baud: 57600}
 	serReader, err := serial.OpenPort(siface)
 	if err != nil {
@@ -86,7 +86,7 @@ LOOP:
 	for {
 		select {
 		case payload := <-serCh:
-			appUlCh <- payload
+			crossCh <- payload
 			fmt.Printf("read nfc data\n- ascii: %s\n- hex: %x\n", string(payload), string(payload))
 
 		case _, more := <-appDlCh:
