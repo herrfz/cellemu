@@ -20,7 +20,7 @@ func DoDataRequest(nodeAddr []byte, dlCh, ulCh, appDlCh, appUlCh, crossCh chan [
 	var COUNTER uint32 = 0
 	var nfcData = make([]byte, 6)
 	// trailing LQI, ED, RX status, RX slot; TODO, all zeros for now
-	var trail = []byte{0x00, 0x00, 0x00, 0x00, 0x00}
+	var trail = []byte{0x00, 0x00, 0x96, 0x00, 0x00}
 
 	// protect access to uplink channel (apps and keymgmt goroutines)
 	var mutex = &sync.Mutex{}

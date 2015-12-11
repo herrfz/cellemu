@@ -59,7 +59,12 @@ func (s SerialReader) ReadDevice() ([]byte, error) {
 						}
 					}
 					wholePacket, _ := hex.DecodeString(packet.String())
-					return re.FindSubmatch(wholePacket)[1], nil // only return the text between tags
+                    matchPacket := re.FindSubmatch(wholePacket)
+                    if len(matchPacket) < 2 {
+                        return nil, fmt.Errorf("DONTPANIC")
+                    } else {
+					    return matchPacket[1], nil // only return the text between tags
+                    }
 				}
 
 			} else { // going well but not at end state yet, read further

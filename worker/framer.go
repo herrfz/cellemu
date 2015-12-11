@@ -118,7 +118,7 @@ func MakeWDCInd(mpdu, trail []byte) []byte {
 	// create WDC_MAC_DATA_IND command from MAC_DATA_IND frame
 	phr := []byte{byte(len(mpdu))}
 	ind := append(phr, append(mpdu, trail...)...)
-	ind = append([]byte{byte(len(ind))}, append([]byte{0x19}, // WDC_MAC_DATA_IND
+	ind = append([]byte{byte(len(ind) + 1)}, append([]byte{0x19}, // WDC_MAC_DATA_IND
 		ind...)...)
 	return ind
 }
