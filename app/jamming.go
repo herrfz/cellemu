@@ -15,7 +15,7 @@ func DoSendJamming(appDlCh, appUlCh, crossCh chan []byte, device string) {
 LOOP:
 	for {
 		select {
-		case <-time.Tick(time.Duration(rand.Intn(5)) + 5*1000*time.Millisecond): // add 5ms jitter
+		case <-time.Tick(time.Duration(rand.Intn(5)) + 7*1000*time.Millisecond): // add 5ms jitter
 			payload := append(basePayload, ED)
 			ED += 1
 			appUlCh <- payload
