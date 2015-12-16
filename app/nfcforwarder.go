@@ -42,6 +42,9 @@ func (s SerialReader) ReadDevice() ([]byte, error) {
 				// construct packet and return
 				lengthBytes := []byte{lsr[BUFSIZE-1], lsr[BUFSIZE-2]}
 				tempLen, _ := hex.DecodeString(string(lengthBytes))
+				if len(tempLen) == 0 {
+					return nil, fmt.Errorf("DONTPANIC")
+				}
 				remLen := 3*int(tempLen[0]) - 24 // times three to take the ascii encoding, i.e. one byte is encoded as two character ascii (e.g. 18 is a one and an eight), and the whitespaces into account
 				rest := make([]byte, remLen)
 				_, err := s.serial.Read(rest)
@@ -59,12 +62,12 @@ func (s SerialReader) ReadDevice() ([]byte, error) {
 						}
 					}
 					wholePacket, _ := hex.DecodeString(packet.String())
-                    matchPacket := re.FindSubmatch(wholePacket)
-                    if len(matchPacket) < 2 {
-                        return nil, fmt.Errorf("DONTPANIC")
-                    } else {
-					    return matchPacket[1], nil // only return the text between tags
-                    }
+					matchPacket := re.FindSubmatch(wholePacket)
+					if len(matchPacket) < 2 {
+						return nil, fmt.Errorf("DONTPANIC")
+					} else {
+						return matchPacket[1], nil // only return the text between tags
+					}
 				}
 
 			} else { // going well but not at end state yet, read further
