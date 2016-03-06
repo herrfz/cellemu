@@ -35,7 +35,7 @@ type node struct {
 	device      string
 }
 
-var chPool [](chan []byte)
+var nodeWdcChannels, chPool [](chan []byte)
 var mutex = &sync.Mutex{} // protect uplink serial access to wdc; multiple node goroutines
 
 func main() {
@@ -91,14 +91,12 @@ func main() {
 
 		// otherwise, start one goroutine per node
 		go func(addr int, curnode node) {
-			coord := false
-			if addr == 0 {
-				// first node shall be coordinator
-				coord = true
-			}
-
 			nodeAddr := make([]byte, 2)
 			binary.LittleEndian.PutUint16(nodeAddr, uint16(addr))
+
+			// channel for receiving wdc message
+			nodeWdcCh := make(chan []byte)
+			nodeWdcChannels = append(nodeWdcChannels, nodeWdcCh)
 
 			// channels for node's processing goroutine
 			dlCh := make(chan []byte)
@@ -118,32 +116,16 @@ func main() {
 		LOOP:
 			for {
 				select {
-				case wdcReq, more := <-wdcCh:
-					go func(wdcReq []byte) { // process wdc message in a separate goroutine
-						if coord {
-							wdcRes := worker.ProcessMessage(wdcReq)
-							if wdcRes != nil {
-								mutex.Lock()
-								serReader.Write(wdcRes) // ignore error on wdc serial write
-								mutex.Unlock()
-								fmt.Println("sent answer to WDC request")
-							}
-						}
-
-						// if MAC_DATA_REQUEST, pass it to node's processing goroutine
-						// can either be local handler or serial forwarder
-						if len(wdcReq) != 0 && wdcReq[1] == 0x17 {
-							reqmsg := worker.WDC_REQ{}
-							reqmsg.ParseWDCReq([]byte(wdcReq))
-							if bytes.Equal(reqmsg.DSTADDR, nodeAddr) || bytes.Equal(reqmsg.DSTADDR, []byte{0xff, 0xff}) { // only process message that is sent to us or broadcast
-								dlCh <- []byte(wdcReq)
-							}
-						}
-					}(wdcReq)
-
+				case wdcReq, more := <-nodeWdcCh:
 					if !more {
 						close(dlCh)
 						break LOOP
+					}
+
+					reqmsg := worker.WDC_REQ{}
+					reqmsg.ParseWDCReq([]byte(wdcReq))
+					if bytes.Equal(reqmsg.DSTADDR, nodeAddr) || bytes.Equal(reqmsg.DSTADDR, []byte{0xff, 0xff}) { // only process message that is sent to us or broadcast
+						dlCh <- []byte(wdcReq)
 					}
 
 				case nodeInd := <-ulCh:
@@ -160,9 +142,27 @@ func main() {
 MAINLOOP:
 	for {
 		select {
+		case wdcReq := <-wdcCh:
+			go func() { // process wdc message in a separate goroutine
+				wdcRes := worker.ProcessMessage(wdcReq)
+				if wdcRes != nil {
+					mutex.Lock()
+					serReader.Write(wdcRes) // ignore error on wdc serial write
+					mutex.Unlock()
+					fmt.Println("sent answer to WDC request")
+				}
+			}()
+
+			// if MAC_DATA_REQUEST, pass it to node goroutines
+			if len(wdcReq) != 0 && wdcReq[1] == 0x17 {
+				for _, ch := range nodeWdcChannels {
+					ch <- wdcReq
+				}
+			}
+
 		case <-intrCh:
-			close(wdcCh)
-			for idx := range chPool {
+			for idx := range nodeWdcChannels {
+				close(nodeWdcChannels[idx])
 				<-chPool[idx]
 			}
 			break MAINLOOP
