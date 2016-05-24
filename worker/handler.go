@@ -18,7 +18,7 @@ func DoDataRequest(nodeAddr []byte, dlCh, ulCh, appDlCh, appUlCh, crossCh chan [
 	var UL_POLICY byte
 	var COUNTER_BYTE = make([]byte, 4)
 	var COUNTER uint32 = 0
-	var nfcData = make([]byte, 6)
+	var nfcData = []byte{0x30, 0x30, 0x30, 0x41, 0x30, 0x30} // 0A00; shall be updated through crossCh channel
 	// trailing LQI, ED, RX status, RX slot; TODO, all zeros for now
 	var trail = []byte{0x00, 0x00, 0x96, 0x00, 0x00}
 
