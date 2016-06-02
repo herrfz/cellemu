@@ -18,7 +18,7 @@ func DoDataRequest(nodeAddr []byte, dlCh, ulCh, appDlCh, appUlCh, crossCh chan [
 	var UL_POLICY byte
 	var COUNTER_BYTE = make([]byte, 4)
 	var COUNTER uint32 = 0
-	var nfcData = []byte{0x30, 0x30, 0x30, 0x41, 0x30, 0x30} // 0A00; shall be updated through crossCh channel
+	var nfcData = []byte{0x30, 0x30, 0x30, 0x41, 0x30, 0x30} // 000A00; shall be updated through crossCh channel
 	// trailing LQI, ED, RX status, RX slot; TODO, all zeros for now
 	var trail = []byte{0x00, 0x00, 0x96, 0x00, 0x00}
 
@@ -101,9 +101,9 @@ LOOP:
 							time.Sleep(1000 * time.Millisecond)
 							assocReq := append(append([]byte{0x05, 0x01}, // assocReq cmd id, seqnbr
 								nfcData...),
-								0x01) // sensorType
+								0x14) // sensorType temperature
 
-							MPDU := MakeMPDU([]byte{0x04, 0xd8},
+							MPDU := MakeMPDU([]byte{0x04, 0x98},
 								[]byte{0xff, 0xff}, []byte{0xff, 0xff},
 								[]byte{0xb1, 0xca}, append(nodeAddr, []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}...),
 								assocReq)
@@ -153,7 +153,7 @@ LOOP:
 							"generated NIK:", hex.EncodeToString(NIK))
 
 						// the MPDU of the return message
-						MPDU := MakeMPDU([]byte{0x01, 0x88}, // fcf, TODO
+						MPDU := MakeMPDU([]byte{0x04, 0x98}, // fcf
 							[]byte{0xff, 0xff}, []byte{0xff, 0xff},
 							wdcReq.DSTPAN, wdcReq.DSTADDR,
 							append([]byte{0x02}, // mID NIK response
