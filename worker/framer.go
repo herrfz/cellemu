@@ -50,7 +50,7 @@ func (frame *DL_AUTH_FRAME) MakeDownlinkFrame(req WDC_REQ) {
 		return
 	}
 
-	frame.FCF = []byte{0x04, 0x98} // FCF
+	frame.FCF = []byte{0x01, 0x98} // FCF
 	frame.SEQNR = []byte{0x00}     // sequence number, must be set to zero
 	frame.DSTPAN = make([]byte, 2)
 	copy(frame.DSTPAN, req.DSTPAN)
@@ -80,7 +80,7 @@ func (frame *UL_FRAME) MakeUplinkFrame(dstpan, dstaddr, srcpan, srcaddr, mid, pa
 	var authdata []byte
 	var authelms [][]byte
 
-	frame.FCF = []byte{0x04, 0x98} // FCF, (see Emeric's email)
+	frame.FCF = []byte{0x01, 0x98} // FCF, (see Emeric's email)
 	frame.SEQNR = []byte{0x00}     // sequence number, must be set to zero
 	frame.MFR = []byte{0xde, 0xad} // fake MFR
 

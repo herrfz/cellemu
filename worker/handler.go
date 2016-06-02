@@ -103,7 +103,7 @@ LOOP:
 								nfcData...),
 								0x14) // sensorType temperature
 
-							MPDU := MakeMPDU([]byte{0x04, 0x98},
+							MPDU := MakeMPDU([]byte{0x04, 0x98}, // FCF MAC command
 								[]byte{0xff, 0xff}, []byte{0xff, 0xff},
 								[]byte{0xb1, 0xca}, append(nodeAddr, []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}...),
 								assocReq)
@@ -153,7 +153,7 @@ LOOP:
 							"generated NIK:", hex.EncodeToString(NIK))
 
 						// the MPDU of the return message
-						MPDU := MakeMPDU([]byte{0x04, 0x98}, // fcf
+						MPDU := MakeMPDU([]byte{0x01, 0x98}, // FCF MAC data
 							[]byte{0xff, 0xff}, []byte{0xff, 0xff},
 							wdcReq.DSTPAN, wdcReq.DSTADDR,
 							append([]byte{0x02}, // mID NIK response

@@ -239,7 +239,7 @@ LOOP:
 
 			MSDU := make([]byte, len(wdcReq.MSDU))
 			copy(MSDU, wdcReq.MSDU) // if I don't do this the MSDU gets corrupted!?!?!?
-			MPDU := MakeMPDU([]byte{0x04, 0x98}, wdcReq.DSTPAN, wdcReq.DSTADDR, []byte{0xff, 0xff}, []byte{0xff, 0xff}, MSDU)
+			MPDU := MakeMPDU([]byte{0x01, 0x98}, wdcReq.DSTPAN, wdcReq.DSTADDR, []byte{0xff, 0xff}, []byte{0xff, 0xff}, MSDU)
 			app := Message{mtype: 3, data: MPDU}
 			msgApp := app.GenerateMessage()
 			s.Write(msgApp)
