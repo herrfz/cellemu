@@ -103,7 +103,7 @@ LOOP:
 								nfcData...),
 								0x14) // sensorType temperature
 
-							MPDU := MakeMPDU([]byte{0x04, 0x98}, // FCF MAC command
+							MPDU := MakeMPDU([]byte{0x04, 0xd8}, // FCF MAC command, long src address
 								[]byte{0xff, 0xff}, []byte{0xff, 0xff},
 								[]byte{0xb1, 0xca}, append(nodeAddr, []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}...),
 								assocReq)
@@ -160,6 +160,8 @@ LOOP:
 								dbp...))
 
 						IND := MakeWDCInd(MPDU, trail)
+
+						time.Sleep(500 * time.Millisecond) // delay to give the server time to react
 
 						mutex.Lock()
 						ulCh <- IND
@@ -220,6 +222,9 @@ LOOP:
 						ulFrame.MakeUplinkFrame([]byte{0xff, 0xff}, []byte{0xff, 0xff}, // WDC
 							dlFrame.DSTPAN, dlFrame.DSTADDR, ulMid, dbp, authkey)
 						IND := MakeWDCInd(ulFrame.FRAME, trail)
+
+						time.Sleep(500 * time.Millisecond) // delay to give the server time to react
+
 						mutex.Lock()
 						ulCh <- IND
 						mutex.Unlock()
@@ -253,6 +258,8 @@ LOOP:
 							SIK)
 						IND := MakeWDCInd(ulFrame.FRAME, trail)
 
+						time.Sleep(500 * time.Millisecond) // delay to give the server time to react
+
 						mutex.Lock()
 						ulCh <- IND
 						mutex.Unlock()
@@ -282,6 +289,8 @@ LOOP:
 							[]byte{0x00}, // status OK
 							SIK)
 						IND := MakeWDCInd(ulFrame.FRAME, trail)
+
+						time.Sleep(500 * time.Millisecond) // delay to give the server time to react
 
 						mutex.Lock()
 						ulCh <- IND
