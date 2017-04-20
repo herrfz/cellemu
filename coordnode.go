@@ -70,7 +70,7 @@ func main() {
 	}
 
 	// configure serial device connecting to wdc
-	siface := &serial.Config{Name: *wdcSerial, Baud: 9600}
+	siface := &serial.Config{Name: *wdcSerial, Baud: 57600}
 	serReader, err := serial.OpenPort(siface)
 	if err != nil {
 		fmt.Println("error opening serial interface:", err.Error())
@@ -129,9 +129,9 @@ func main() {
 					}
 
 				case nodeInd := <-ulCh:
-					mutex.Lock()
+					//mutex.Lock()
 					serReader.Write(nodeInd) // ignore error on wdc serial write
-					mutex.Unlock()
+					//mutex.Unlock()
 					fmt.Println("sent node uplink message")
 				}
 			}
@@ -143,15 +143,13 @@ MAINLOOP:
 	for {
 		select {
 		case wdcReq := <-wdcCh:
-			go func() { // process wdc message in a separate goroutine
-				wdcRes := worker.ProcessMessage(wdcReq)
-				if wdcRes != nil {
-					mutex.Lock()
-					serReader.Write(wdcRes) // ignore error on wdc serial write
-					mutex.Unlock()
-					fmt.Println("sent answer to WDC request")
-				}
-			}()
+			wdcRes := worker.ProcessMessage(wdcReq)
+			if wdcRes != nil {
+				//mutex.Lock()
+				serReader.Write(wdcRes) // ignore error on wdc serial write
+				//mutex.Unlock()
+				fmt.Println("sent answer to WDC request")
+			}
 
 			// if MAC_DATA_REQUEST, pass it to node goroutines
 			if len(wdcReq) != 0 && wdcReq[1] == 0x17 {

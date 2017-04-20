@@ -18,12 +18,19 @@ func DoDataRequest(nodeAddr []byte, dlCh, ulCh, appDlCh, appUlCh, crossCh chan [
 	var UL_POLICY byte
 	var COUNTER_BYTE = make([]byte, 4)
 	var COUNTER uint32 = 0
-	var nfcData = []byte{0x30, 0x30, 0x30, 0x41, 0x30, 0x30} // 000A00; shall be updated through crossCh channel
+	var nfcData = make([]byte, 6)
+	copy(nfcData, []byte{0x30, 0x30, 0x30, 0x41}) // 000Axx; shall be updated through crossCh channel
 	// trailing LQI, ED, RX status, RX slot; TODO, all zeros for now
 	var trail = []byte{0x00, 0x00, 0x96, 0x00, 0x00}
 
 	// protect access to uplink channel (apps and keymgmt goroutines)
 	var mutex = &sync.Mutex{}
+
+	addr := binary.LittleEndian.Uint16(nodeAddr)
+	addr = 12336 + addr // ascii offset: 12336, 0x3030
+	bigEAddr := make([]byte, 2)
+	binary.BigEndian.PutUint16(bigEAddr, uint16(addr))
+	copy(nfcData[4:], bigEAddr)
 
 LOOP:
 	for {
